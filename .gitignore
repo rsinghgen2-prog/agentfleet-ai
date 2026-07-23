@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+build/
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+
+# Production
+/agentfleet-ai/dist/
+/agentfleet-ai/build/
+/agentfleet-ai/node_modules/
+
+# Backend
+/backend/node_modules/
+/backend/dist/
+/backend/.env
+
+# Misc
+.cache/
+.parcel-cache/
+.next/
+out/
