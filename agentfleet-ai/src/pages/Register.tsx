@@ -24,6 +24,8 @@ const Register = () => {
     // Business Info
     businessName: '',
     industry: '',
+    category: '',
+    subcategory: '',
 
     // Account Info
     password: '',
@@ -33,22 +35,51 @@ const Register = () => {
     plan: 'free'
   })
 
-  const industries = [
-    'E-commerce',
-    'Healthcare',
-    'Education',
-    'Real Estate',
-    'Restaurant/Food',
-    'Retail',
-    'Financial Services',
-    'Technology',
-    'Other'
-  ]
+  // Business categories with subcategories
+  const businessCategories = {
+    'Healthcare': {
+      subcategories: ['Dental Clinic', 'Hospital', 'Pharmacy', 'Diagnostic Center', 'Physiotherapy', 'Mental Health', 'Veterinary']
+    },
+    'Education': {
+      subcategories: ['School', 'College', 'Coaching Institute', 'Online Learning', 'Preschool', 'Vocational Training']
+    },
+    'Retail': {
+      subcategories: ['Fashion Store', 'Electronics', 'Grocery', 'Furniture', 'Jewelry', 'Sports Equipment', 'Book Store']
+    },
+    'Food & Beverage': {
+      subcategories: ['Restaurant', 'Cafe', 'Cloud Kitchen', 'Bakery', 'Catering Service', 'Food Truck']
+    },
+    'Professional Services': {
+      subcategories: ['Legal', 'Accounting', 'Consulting', 'Real Estate', 'Insurance', 'Marketing Agency']
+    },
+    'Fitness & Wellness': {
+      subcategories: ['Gym', 'Yoga Studio', 'Spa', 'Salon', 'Nutrition Counseling', 'Wellness Center']
+    },
+    'Automotive': {
+      subcategories: ['Car Dealership', 'Auto Repair', 'Car Wash', 'Spare Parts', 'Car Rental']
+    },
+    'Technology': {
+      subcategories: ['Software Company', 'IT Services', 'Web Development', 'Mobile Apps', 'SaaS']
+    },
+    'Other': {
+      subcategories: ['General Business']
+    }
+  }
+
+  const industries = Object.keys(businessCategories)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const updates: any = { [e.target.name]: e.target.value }
+
+    // Reset subcategory when category changes
+    if (e.target.name === 'category') {
+      updates.subcategory = ''
+      updates.industry = e.target.value // Keep for backward compatibility
+    }
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      ...updates
     })
   }
 
@@ -59,8 +90,8 @@ const Register = () => {
         return
       }
     } else if (step === 2) {
-      if (!formData.businessName || !formData.industry) {
-        alert('Please fill in all business information fields')
+      if (!formData.businessName || !formData.category || !formData.subcategory) {
+        alert('Please fill in all business information fields including category and subcategory')
         return
       }
     }
@@ -259,22 +290,42 @@ const Register = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Industry *</label>
+                  <label className="block text-sm font-semibold mb-2">Business Category *</label>
                   <select
-                    name="industry"
-                    value={formData.industry}
+                    name="category"
+                    value={formData.category}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 glass-card rounded-lg text-white"
                     required
                   >
-                    <option value="">Select your industry</option>
-                    {industries.map((industry) => (
-                      <option key={industry} value={industry} className="bg-gray-900">
-                        {industry}
+                    <option value="">Select business category</option>
+                    {industries.map((category) => (
+                      <option key={category} value={category} className="bg-gray-900">
+                        {category}
                       </option>
                     ))}
                   </select>
                 </div>
+
+                {formData.category && (
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Subcategory *</label>
+                    <select
+                      name="subcategory"
+                      value={formData.subcategory}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 glass-card rounded-lg text-white"
+                      required
+                    >
+                      <option value="">Select subcategory</option>
+                      {businessCategories[formData.category as keyof typeof businessCategories]?.subcategories.map((sub) => (
+                        <option key={sub} value={sub} className="bg-gray-900">
+                          {sub}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="flex gap-4">
                   <motion.button

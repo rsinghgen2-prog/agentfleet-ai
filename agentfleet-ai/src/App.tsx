@@ -12,6 +12,7 @@ import Payment from './pages/Payment'
 import Dashboard from './pages/Dashboard'
 import EnhancedDashboard from './pages/EnhancedDashboard'
 import DentalDashboard from './pages/DentalDashboard'
+import IndustryDashboard from './pages/IndustryDashboard'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -44,6 +45,12 @@ function App() {
 
             {/* Protected Routes - Require Login */}
             <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <IndustryDashboard />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/enhanced-dashboard" element={
               <ProtectedRoute>
                 <EnhancedDashboard />
               </ProtectedRoute>
