@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Mail, Lock, ArrowLeft, Sparkles, AlertCircle, Check } from 'lucide-react'
 import { SUPER_ADMIN, validateSuperAdmin } from '../config/superAdmin'
+import { validateClient } from '../config/clients'
 
 const Login = () => {
   const navigate = useNavigate()
@@ -47,20 +48,32 @@ const Login = () => {
       localStorage.removeItem('savedPassword')
     }
 
-    // Check if super admin login
+    // 1. Check if Super Admin
     if (validateSuperAdmin(formData.email, formData.password)) {
-      // Create super admin session
       localStorage.setItem('userRegistration', JSON.stringify(SUPER_ADMIN))
       localStorage.setItem('isLoggedIn', 'true')
       localStorage.setItem('currentUser', formData.email)
       localStorage.setItem('isSuperAdmin', 'true')
-
-      // Redirect to dashboard
+      localStorage.setItem('userType', 'super-admin')
       navigate('/dashboard')
       return
     }
 
-    // Regular user login
+    // 2. Check if Client (Multi-tenant)
+    const client = validateClient(formData.email, formData.password)
+    if (client) {
+      localStorage.setItem('isLoggedIn', 'true')
+      localStorage.setItem('userType', 'client')
+      localStorage.setItem('clientData', JSON.stringify(client))
+      localStorage.setItem('currentUser', formData.email)
+
+      // Route to appropriate client dashboard based on dashboard type
+      const dashboardRoute = client.dashboardType === 'dental' ? '/dental-client' : '/admin-dashboard'
+      navigate(dashboardRoute)
+      return
+    }
+
+    // 3. Regular user login
     const storedRegistration = localStorage.getItem('userRegistration')
 
     if (!storedRegistration) {
@@ -84,28 +97,17 @@ const Login = () => {
     // Set login session
     localStorage.setItem('isLoggedIn', 'true')
     localStorage.setItem('currentUser', formData.email)
-    localStorage.removeItem('isSuperAdmin') // Ensure not super admin
+    localStorage.setItem('userType', 'registered-user')
+    localStorage.removeItem('isSuperAdmin')
 
     // Check if payment is pending
     if (!userData.paymentCompleted && userData.plan !== 'free') {
-      // Redirect to payment page
       navigate('/payment')
       return
     }
 
-    // Determine dashboard based on user type
-    let dashboardRoute = '/admin-dashboard'
-
-    // Check if super admin
-    const isSuperAdmin = localStorage.getItem('isSuperAdmin') === 'true'
-    if (isSuperAdmin) {
-      dashboardRoute = '/dashboard'  // Industry Dashboard with Appointments default
-    } else {
-      dashboardRoute = '/admin-dashboard'  // New modern admin dashboard for all clients
-    }
-
-    // Redirect to appropriate dashboard (NOT homepage)
-    navigate(dashboardRoute)
+    // Redirect to admin dashboard for registered users
+    navigate('/admin-dashboard')
   }
 
   return (
