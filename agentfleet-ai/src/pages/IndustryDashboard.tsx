@@ -17,6 +17,7 @@ import {
   DollarSign,
   CheckCircle
 } from 'lucide-react'
+import AppointmentCalendar from '../components/AppointmentCalendar'
 
 interface UserData {
   fullName: string
@@ -272,8 +273,17 @@ const IndustryDashboard = () => {
 
         {/* Dashboard Content */}
         <main className="flex-1 overflow-y-auto p-8 bg-gray-50">
-          {/* Metrics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+          {/* Show Appointment Calendar when appointments menu is active */}
+          {activeMenu === 'appointments' ? (
+            <AppointmentCalendar
+              businessHours={{ start: '09:00', end: '18:00' }}
+              slotDuration={30}
+              breakTimes={[{ start: '13:00', end: '14:00' }]}
+            />
+          ) : (
+            <>
+              {/* Metrics Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
             {metrics.map((metric, index) => {
               const Icon = metric.icon
               const colorClasses = {
@@ -335,12 +345,14 @@ const IndustryDashboard = () => {
             </div>
           )}
 
-          {/* Generic Dashboard for other industries */}
-          {!(userData.category === 'Healthcare' && userData.subcategory === 'Dental Clinic') && (
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">Recent Activity</h2>
-              <p className="text-gray-600">Your {userData.subcategory} dashboard content will appear here.</p>
-            </div>
+              {/* Generic Dashboard for other industries */}
+              {!(userData.category === 'Healthcare' && userData.subcategory === 'Dental Clinic') && (
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                  <h2 className="text-lg font-bold text-gray-800 mb-4">Recent Activity</h2>
+                  <p className="text-gray-600">Your {userData.subcategory} dashboard content will appear here.</p>
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>
