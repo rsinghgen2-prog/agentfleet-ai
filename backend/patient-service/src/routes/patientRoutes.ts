@@ -12,6 +12,9 @@ router.use(tenantMiddleware);
 // Get dashboard data (patients, appointments, stats)
 router.get('/dashboard', PatientController.getDashboardData);
 
+// Create new booking (patient + appointment)
+router.post('/bookings', PatientController.createBooking);
+
 // Patient routes
 router.get('/patients', PatientController.getPatients);
 router.get('/patients/:id', PatientController.getPatientById);

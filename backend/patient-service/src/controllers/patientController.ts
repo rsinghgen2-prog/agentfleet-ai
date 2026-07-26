@@ -180,6 +180,58 @@ export class PatientController {
     }
   }
 
+  /**
+   * Create new patient and appointment booking
+   * POST /api/v1/patients/bookings
+   */
+  static async createBooking(req: Request, res: Response) {
+    try {
+      const tenantSchema = (req as any).tenantSchema;
+      const {
+        firstName, lastName, phone, email, dateOfBirth, gender,
+        appointmentDate, appointmentTime, appointmentType, reason, notes
+      } = req.body;
+
+      // 1. Create patient first
+      const patientResult = await pool.query(`
+        INSERT INTO ${tenantSchema}.patients
+        (first_name, last_name, phone, email, date_of_birth, gender, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+        RETURNING id
+      `, [firstName, lastName, phone, email, dateOfBirth || null, gender]);
+
+      const patientId = patientResult.rows[0].id;
+
+      // 2. Create appointment
+      const appointmentResult = await pool.query(`
+        INSERT INTO ${tenantSchema}.appointments
+        (patient_id, appointment_date, appointment_time, duration, appointment_type, status, reason, notes, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+        RETURNING id
+      `, [patientId, appointmentDate, appointmentTime, 30, appointmentType, 'scheduled', reason, notes || '']);
+
+      const appointmentId = appointmentResult.rows[0].id;
+
+      res.json({
+        success: true,
+        message: 'Booking created successfully',
+        data: {
+          patientId,
+          appointmentId,
+          appointmentDate,
+          appointmentTime
+        }
+      });
+    } catch (error: any) {
+      console.error('Error creating booking:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create booking',
+        error: error.message
+      });
+    }
+  }
+
   // Placeholder methods (to be implemented)
   static async getPatientById(req: Request, res: Response) { res.json({ success: true }); }
   static async createPatient(req: Request, res: Response) { res.json({ success: true }); }

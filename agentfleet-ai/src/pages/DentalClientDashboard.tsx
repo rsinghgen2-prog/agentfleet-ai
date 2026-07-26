@@ -11,9 +11,14 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal
+  MoreHorizontal,
+  UserPlus,
+  MapPin,
+  Phone,
+  Mail
 } from 'lucide-react'
 import { DashboardService, type DashboardData, type Appointment } from '../services/dashboardService'
+import { BookingModal, type BookingFormData } from '../components/BookingModal'
 
 const DentalClientDashboard = () => {
   const navigate = useNavigate()
@@ -21,6 +26,7 @@ const DentalClientDashboard = () => {
   const [currentDate, setCurrentDate] = useState(new Date()) // Current date
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
 
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('isLoggedIn')
@@ -49,6 +55,24 @@ const DentalClientDashboard = () => {
       console.error('Failed to load dashboard data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleBookingSubmit = async (bookingData: BookingFormData) => {
+    try {
+      console.log('Booking submitted:', bookingData)
+
+      // Send to backend API
+      const result = await DashboardService.createBooking(bookingData)
+
+      if (result.success) {
+        console.log('Booking created successfully:', result.data)
+        // Reload dashboard data to show new appointment
+        await loadDashboardData()
+      }
+    } catch (error) {
+      console.error('Failed to create booking:', error)
+      alert('Failed to create booking. Please try again.')
     }
   }
 
@@ -189,12 +213,18 @@ const DentalClientDashboard = () => {
 
         {/* Main Content */}
         <main className="flex-1 p-8">
-          {/* Greeting */}
-          <div className="mb-8">
-            <h2 className="text-3xl mb-2">
-              Good Morning <span className="text-sky-600 font-bold">{clientData.clientName}</span> 👋
+          {/* Greeting & Action */}
+          <div className="mb-8 flex items-center justify-between">
+            <h2 className="text-3xl">
+              Good Morning <span className="text-sky-600 dark:text-sky-400 font-bold">{clientData.clientName}</span> 👋
             </h2>
-            <p className="text-sm text-gray-500">{clientData.address}</p>
+            <button
+              onClick={() => setIsBookingModalOpen(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-sky-500 to-cyan-600 text-white rounded-xl hover:from-sky-600 hover:to-cyan-700 transition shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              <UserPlus size={20} />
+              <span className="font-semibold">New Patient Booking</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-3 gap-6">
@@ -406,7 +436,82 @@ const DentalClientDashboard = () => {
             </div>
           </div>
         </main>
+
+        {/* Footer */}
+        <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto transition-colors duration-300">
+          <div className="max-w-7xl mx-auto px-6 py-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Clinic Info */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-sky-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white text-xl">🦷</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-800 dark:text-gray-100">{clientData.brandName}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Professional Dental Care</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Providing quality dental care with state-of-the-art technology and experienced professionals.
+                </p>
+              </div>
+
+              {/* Contact Info */}
+              <div>
+                <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-3">Contact Us</h4>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <MapPin size={16} className="text-sky-600 mt-0.5 flex-shrink-0" />
+                    <span>128/31, F Block Kidwai Nagar Kanpur, Near Matadeen Hp Petrol Pump, Geeta Park, Kidwai Nagar, Kanpur-208011, Uttar Pradesh</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <Phone size={16} className="text-sky-600" />
+                    <span>+91-XXXXXXXXXX</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <Mail size={16} className="text-sky-600" />
+                    <span>contact@vpsdental.com</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Working Hours */}
+              <div>
+                <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-3">Working Hours</h4>
+                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex justify-between">
+                    <span>Monday - Friday:</span>
+                    <span className="font-medium">8:00 AM - 8:00 PM</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Saturday:</span>
+                    <span className="font-medium">9:00 AM - 6:00 PM</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Sunday:</span>
+                    <span className="font-medium">Closed</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Copyright */}
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                © 2026 {clientData.brandName}. All rights reserved. | Powered by AgentFleet AI
+              </p>
+            </div>
+          </div>
+        </footer>
       </div>
+
+      {/* Booking Modal */}
+      <BookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        onSubmit={handleBookingSubmit}
+      />
     </div>
   )
 }

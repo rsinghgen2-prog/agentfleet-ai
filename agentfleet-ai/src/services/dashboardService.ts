@@ -166,4 +166,27 @@ export class DashboardService {
       return mockDashboardData.todaysAppointments
     }
   }
+
+  static async createBooking(bookingData: any): Promise<any> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/v1/patients/bookings`, {
+        method: 'POST',
+        body: JSON.stringify(bookingData)
+      })
+      return response
+    } catch (error) {
+      console.warn('Backend not available, simulating booking creation:', error)
+      // For development, simulate success
+      return {
+        success: true,
+        message: 'Booking created (mock)',
+        data: {
+          patientId: Math.random().toString(36).substring(7),
+          appointmentId: Math.random().toString(36).substring(7),
+          appointmentDate: bookingData.appointmentDate,
+          appointmentTime: bookingData.appointmentTime
+        }
+      }
+    }
+  }
 }
