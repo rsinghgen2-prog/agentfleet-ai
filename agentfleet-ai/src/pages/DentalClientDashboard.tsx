@@ -11,13 +11,20 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal
+  MoreHorizontal,
+  Sun,
+  Moon
 } from 'lucide-react'
+import { useTheme } from '../context/ThemeContext'
+import { DashboardService, type DashboardData, type Appointment } from '../services/dashboardService'
 
 const DentalClientDashboard = () => {
   const navigate = useNavigate()
+  const { theme, toggleTheme, isDark } = useTheme()
   const [clientData, setClientData] = useState<any>(null)
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 9, 1)) // October 2025
+  const [currentDate, setCurrentDate] = useState(new Date()) // Current date
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('isLoggedIn')
@@ -30,16 +37,36 @@ const DentalClientDashboard = () => {
     if (client) {
       setClientData(JSON.parse(client))
     }
+
+    // Load dashboard data from backend/mock
+    loadDashboardData()
   }, [navigate])
 
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true)
+      const data = await DashboardService.getDashboardData()
+      setDashboardData(data)
+      // Set current date based on backend data
+      setCurrentDate(new Date(data.currentDate.year, data.currentDate.month - 1, 1))
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
 
-  const patients = [
-    { id: 1, name: 'Guy Hawkins', time: '08:00 AM', type: 'Weekly Visit', avatar: '👨' },
-    { id: 2, name: 'Jane Cooper', time: '10:00 AM', type: 'Weekly Visit', avatar: '👩' },
-    { id: 3, name: 'Leslie Alexander', time: '14:00 PM', type: 'Weekly Visit', avatar: '👨' },
-    { id: 4, name: 'Jenny Wilson', time: '16:00 PM', type: 'Routine Checkup', avatar: '👩', color: 'text-orange-500' }
-  ]
+
+  // Get patients from dashboard data or use empty array
+  const patients = dashboardData?.todaysAppointments.map((apt: Appointment) => ({
+    id: apt.id,
+    name: `${apt.first_name} ${apt.last_name}`,
+    time: apt.appointment_time.substring(0, 5), // Format HH:MM
+    type: apt.appointment_type,
+    avatar: apt.gender === 'Male' ? '👨' : '👩',
+    color: apt.appointment_type.includes('Routine') ? 'text-orange-500' : 'text-green-500'
+  })) || []
 
   const selectedPatient = {
     name: 'Guy Hawkins',
@@ -60,7 +87,7 @@ const DentalClientDashboard = () => {
     const month = currentDate.getMonth()
     const firstDay = new Date(year, month, 1).getDay()
     const daysInMonth = new Date(year, month + 1, 0).getDate()
-    
+
     const days = []
     for (let i = 0; i < firstDay; i++) {
       days.push(null)
@@ -71,13 +98,33 @@ const DentalClientDashboard = () => {
     return days
   }
 
+  // Check if a day has appointments
+  const hasAppointments = (day: number) => {
+    if (!dashboardData?.calendarData) return false
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    return dashboardData.calendarData.some(apt => apt.appointment_date === dateStr)
+  }
+
+  // Check if day is today
+  const isToday = (day: number) => {
+    const today = new Date()
+    return day === today.getDate() &&
+           currentDate.getMonth() === today.getMonth() &&
+           currentDate.getFullYear() === today.getFullYear()
+  }
+
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
   const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
   if (!clientData) return null
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="text-2xl font-semibold text-gray-600 dark:text-gray-300">Loading dashboard...</div>
+    </div>
+  )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-cyan-50">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
       {/* Top Navigation */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
         <div className="flex items-center justify-between">
