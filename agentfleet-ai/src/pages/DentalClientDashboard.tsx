@@ -11,16 +11,12 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
-  Sun,
-  Moon
+  MoreHorizontal
 } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
 import { DashboardService, type DashboardData, type Appointment } from '../services/dashboardService'
 
 const DentalClientDashboard = () => {
   const navigate = useNavigate()
-  const { theme, toggleTheme, isDark } = useTheme()
   const [clientData, setClientData] = useState<any>(null)
   const [currentDate, setCurrentDate] = useState(new Date()) // Current date
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
@@ -98,15 +94,16 @@ const DentalClientDashboard = () => {
     return days
   }
 
-  // Check if a day has appointments
-  const hasAppointments = (day: number) => {
-    if (!dashboardData?.calendarData) return false
+  // Check if a day has appointments - Used in calendar rendering
+  const hasAppointments = (day: number | null) => {
+    if (!day || !dashboardData?.calendarData) return false
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     return dashboardData.calendarData.some(apt => apt.appointment_date === dateStr)
   }
 
-  // Check if day is today
-  const isToday = (day: number) => {
+  // Check if day is today - Used in calendar rendering
+  const isToday = (day: number | null) => {
+    if (!day) return false
     const today = new Date()
     return day === today.getDate() &&
            currentDate.getMonth() === today.getMonth() &&
@@ -357,17 +354,22 @@ const DentalClientDashboard = () => {
                 </div>
 
                 <div className="grid grid-cols-7 gap-2">
-                  {getDaysInMonth().map((day, idx) => (
-                    <div
-                      key={idx}
-                      className={`aspect-square flex items-center justify-center text-sm rounded-xl font-medium transition-all
-                        ${day === null ? 'invisible' : 'hover:bg-sky-50 cursor-pointer border border-gray-100'}
-                        ${day === 12 || day === 15 || day === 23 ? 'bg-gradient-to-br from-sky-600 to-cyan-600 text-white font-bold shadow-md hover:shadow-lg border-0' : 'text-gray-700'}
-                      `}
-                    >
-                      {day}
-                    </div>
-                  ))}
+                  {getDaysInMonth().map((day, idx) => {
+                    const hasApt = hasAppointments(day)
+                    const today = isToday(day)
+                    return (
+                      <div
+                        key={idx}
+                        className={`aspect-square flex items-center justify-center text-sm rounded-xl font-medium transition-all
+                          ${day === null ? 'invisible' : 'hover:bg-sky-50 cursor-pointer border border-gray-100'}
+                          ${hasApt || today ? 'bg-gradient-to-br from-sky-600 to-cyan-600 text-white font-bold shadow-md hover:shadow-lg border-0' : 'text-gray-700'}
+                          ${today && !hasApt ? 'ring-2 ring-sky-400' : ''}
+                        `}
+                      >
+                        {day}
+                      </div>
+                    )
+                  })}
                 </div>
 
                 <div className="mt-6">
