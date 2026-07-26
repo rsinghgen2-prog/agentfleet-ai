@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard'
 import EnhancedDashboard from './pages/EnhancedDashboard'
 import DentalDashboard from './pages/DentalDashboard'
 import IndustryDashboard from './pages/IndustryDashboard'
+import AdminDashboard from './pages/AdminDashboard'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -65,6 +66,12 @@ function App() {
             <Route path="/dental-dashboard" element={
               <ProtectedRoute>
                 <DentalDashboard />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/admin-dashboard" element={
+              <ProtectedRoute>
+                <AdminDashboard />
               </ProtectedRoute>
             } />
 

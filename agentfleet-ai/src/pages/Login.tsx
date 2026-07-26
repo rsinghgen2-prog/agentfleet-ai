@@ -93,15 +93,15 @@ const Login = () => {
       return
     }
 
-    // Determine dashboard based on industry
-    let dashboardRoute = '/dashboard'
+    // Determine dashboard based on user type
+    let dashboardRoute = '/admin-dashboard'
 
-    if (userData.industry === 'Dental' || userData.industry === 'Healthcare') {
-      dashboardRoute = '/dental-dashboard'
-    } else if (userData.industry === 'School' || userData.industry === 'Education') {
-      dashboardRoute = '/school-dashboard'  // Create this later
+    // Check if super admin
+    const isSuperAdmin = localStorage.getItem('isSuperAdmin') === 'true'
+    if (isSuperAdmin) {
+      dashboardRoute = '/dashboard'  // Industry Dashboard with Appointments default
     } else {
-      dashboardRoute = '/dashboard'
+      dashboardRoute = '/admin-dashboard'  // New modern admin dashboard for all clients
     }
 
     // Redirect to appropriate dashboard (NOT homepage)
