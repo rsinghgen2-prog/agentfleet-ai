@@ -38,6 +38,7 @@ interface CurrencyInfo {
 const IndustryDashboard = () => {
   const navigate = useNavigate()
   const [userData, setUserData] = useState<UserData | null>(null)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [activeMenu, setActiveMenu] = useState('dashboard')
   const [currency, setCurrency] = useState<CurrencyInfo>({
     code: 'USD',
@@ -80,6 +81,15 @@ const IndustryDashboard = () => {
     if (!isLoggedIn) {
       navigate('/login')
       return
+    }
+
+    // Check if super admin
+    const superAdminFlag = localStorage.getItem('isSuperAdmin') === 'true'
+    setIsSuperAdmin(superAdminFlag)
+
+    // If super admin, set default to appointments view
+    if (superAdminFlag) {
+      setActiveMenu('appointments')
     }
 
     const registration = localStorage.getItem('userRegistration')
@@ -214,9 +224,16 @@ const IndustryDashboard = () => {
           <p className="text-xs text-gray-500 mt-1">{userData.subcategory}</p>
         </div>
 
-        <div className="p-4 border-b bg-blue-50">
+        <div className={`p-4 border-b ${isSuperAdmin ? 'bg-red-50' : 'bg-blue-50'}`}>
           <div className="text-sm font-medium text-gray-800">{userData.fullName}</div>
           <div className="text-xs text-gray-600">{userData.email}</div>
+          {isSuperAdmin && (
+            <div className="mt-2">
+              <span className="text-xs px-2 py-1 bg-red-500 text-white rounded-full font-medium">
+                👑 Super Admin
+              </span>
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
