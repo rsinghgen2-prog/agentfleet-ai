@@ -1,32 +1,35 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Home,
+  ArrowDownRight,
+  ArrowUpRight,
   Calendar as CalendarIcon,
-  MessageSquare,
-  Users,
-  Settings,
-  HelpCircle,
-  Bell,
-  Search,
   ChevronLeft,
   ChevronRight,
+  Grid,
   MoreHorizontal,
-  UserPlus,
-  MapPin,
-  Phone,
-  Mail
+  Smile,
+  Sparkles,
+  Moon,
+  Sun,
+  Settings,
+  LogOut
 } from 'lucide-react'
 import { DashboardService, type DashboardData, type Appointment } from '../services/dashboardService'
 import { BookingModal, type BookingFormData } from '../components/BookingModal'
+import { useTheme } from '../context/ThemeContext'
 
 const DentalClientDashboard = () => {
   const navigate = useNavigate()
   const [clientData, setClientData] = useState<any>(null)
-  const [currentDate, setCurrentDate] = useState(new Date()) // Current date
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [bookingFilter, setBookingFilter] = useState('Today')
+  const filterOptions = ['Today', 'Tomorrow', 'Next three days', 'Next seven days']
+  const { toggleTheme, isDark } = useTheme()
 
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('isLoggedIn')
@@ -36,11 +39,7 @@ const DentalClientDashboard = () => {
     }
 
     const client = localStorage.getItem('clientData')
-    if (client) {
-      setClientData(JSON.parse(client))
-    }
-
-    // Load dashboard data from backend/mock
+    if (client) setClientData(JSON.parse(client))
     loadDashboardData()
   }, [navigate])
 
@@ -49,10 +48,9 @@ const DentalClientDashboard = () => {
       setLoading(true)
       const data = await DashboardService.getDashboardData()
       setDashboardData(data)
-      // Set current date based on backend data
       setCurrentDate(new Date(data.currentDate.year, data.currentDate.month - 1, 1))
     } catch (error) {
-      console.error('Failed to load dashboard data:', error)
+      console.error(error)
     } finally {
       setLoading(false)
     }
@@ -60,458 +58,384 @@ const DentalClientDashboard = () => {
 
   const handleBookingSubmit = async (bookingData: BookingFormData) => {
     try {
-      console.log('Booking submitted:', bookingData)
-
-      // Send to backend API
       const result = await DashboardService.createBooking(bookingData)
-
       if (result.success) {
-        console.log('Booking created successfully:', result.data)
-        // Reload dashboard data to show new appointment
         await loadDashboardData()
+        setIsBookingModalOpen(false)
       }
     } catch (error) {
-      console.error('Failed to create booking:', error)
-      alert('Failed to create booking. Please try again.')
+      console.error(error)
+      alert('Unable to create booking. Please try again.')
     }
   }
 
-
-
-  // Get patients from dashboard data or use empty array
-  const patients = dashboardData?.todaysAppointments.map((apt: Appointment) => ({
-    id: apt.id,
-    name: `${apt.first_name} ${apt.last_name}`,
-    time: apt.appointment_time.substring(0, 5), // Format HH:MM
-    type: apt.appointment_type,
-    avatar: apt.gender === 'Male' ? '👨' : '👩',
-    color: apt.appointment_type.includes('Routine') ? 'text-orange-500' : 'text-green-500'
-  })) || []
-
-  const selectedPatient = {
-    name: 'Guy Hawkins',
-    gender: 'Male',
-    age: 28,
-    services: [
-      { name: 'Braces', icon: '🦷' },
-      { name: 'Whitening', icon: '🦷' },
-      { name: 'Cavity', icon: '🦷' }
-    ],
-    lastChecked: { doctor: 'Dr Smith', date: '10 October 2023', prescription: '#9C672QA1' },
-    observation: 'Multiple cavities detected in molars; slight enamel erosion observed.',
-    prescription: 'Fluoride Toothpaste - Use twice daily\nDental Filling Appointment - Scheduled for 20 October 2023'
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn')
+    localStorage.removeItem('clientData')
+    navigate('/login')
   }
+
+  const handleSettings = () => {
+    setIsUserMenuOpen(false)
+    navigate('/settings')
+  }
+
+  const patients =
+    dashboardData?.todaysAppointments.map((apt: Appointment) => ({
+      id: apt.id,
+      name: `${apt.first_name} ${apt.last_name}`,
+      type: apt.appointment_type,
+      time: apt.appointment_time.substring(0, 5),
+      date: apt.appointment_date,
+      badge: apt.appointment_type.includes('Routine') ? 'Routine' : 'Follow-up',
+      gender: apt.gender
+    })) || []
+
+  const selectedFilterPatients = patients.filter((patient) => {
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const appointmentDate = new Date(`${patient.date}T00:00:00`)
+    const msPerDay = 24 * 60 * 60 * 1000
+    const diff = Math.floor((appointmentDate.getTime() - todayStart.getTime()) / msPerDay)
+
+    switch (bookingFilter) {
+      case 'Tomorrow':
+        return diff === 1
+      case 'Next three days':
+        return diff >= 0 && diff < 3
+      case 'Next seven days':
+        return diff >= 0 && diff < 7
+      default:
+        return diff === 0
+    }
+  })
+
+  const monthNames = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
+  ]
+
+  const currentMonthName = monthNames[currentDate.getMonth()]
 
   const getDaysInMonth = () => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
     const firstDay = new Date(year, month, 1).getDay()
     const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const days = [] as Array<number | null>
 
-    const days = []
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null)
-    }
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(i)
-    }
+    for (let i = 0; i < firstDay; i += 1) days.push(null)
+    for (let day = 1; day <= daysInMonth; day += 1) days.push(day)
+
     return days
   }
 
-  // Check if a day has appointments - Used in calendar rendering
   const hasAppointments = (day: number | null) => {
-    if (!day || !dashboardData?.calendarData) return false
-    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    return dashboardData.calendarData.some(apt => apt.appointment_date === dateStr)
+    if (day === null || !dashboardData?.calendarData) return false
+    const dateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    return dashboardData.calendarData.some(item => item.appointment_date === dateString)
   }
 
-  // Check if day is today - Used in calendar rendering
   const isToday = (day: number | null) => {
-    if (!day) return false
+    if (day === null) return false
     const today = new Date()
-    return day === today.getDate() &&
-           currentDate.getMonth() === today.getMonth() &&
-           currentDate.getFullYear() === today.getFullYear()
+    return (
+      day === today.getDate() &&
+      currentDate.getMonth() === today.getMonth() &&
+      currentDate.getFullYear() === today.getFullYear()
+    )
   }
-
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-  const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
   if (!clientData) return null
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="text-2xl font-semibold text-gray-600 dark:text-gray-300">Loading dashboard...</div>
-    </div>
-  )
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--body-bg)] text-[var(--body-text)] transition-colors duration-300">
+        <div className="text-xl font-semibold">Loading dashboard…</div>
+      </div>
+    )
+  }
+
+  const doctorName = clientData.clientName || 'Dr. Rajeev Pratap Singh'
+  const clinicAddress = clientData.address || '128/31, F Block Kidwai Nagar, Kanpur, Near Matadeen HP Petrol Pump, Geeta Park, Kidwai Nagar, Kanpur-208011, Uttar Pradesh, India'
+  const todayVisits = dashboardData?.stats.todayVisits ?? 790
+  const newPatients = dashboardData?.stats.newPatientsToday ?? 750
+  const returningPatients = dashboardData?.stats.totalAppointmentsToday ?? 40
+  const upcomingAppointment = dashboardData?.todaysAppointments?.[0]
+    ? {
+        title: dashboardData.todaysAppointments[0].appointment_type,
+        date: dashboardData.todaysAppointments[0].appointment_date,
+        time: dashboardData.todaysAppointments[0].appointment_time.substring(0, 5)
+      }
+    : {
+        title: "Monthly doctor's meet",
+        date: '12 October, 2025',
+        time: '08:00 PM'
+      }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
-      {/* Top Navigation */}
-      <nav className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-sky-500 to-cyan-500 rounded-xl flex items-center justify-center">
-                <span className="text-white text-2xl">🦷</span>
-              </div>
+    <div className="min-h-screen bg-[var(--body-bg)] text-[var(--body-text)] transition-colors duration-300">
+      <div className="mx-auto max-w-[1480px] px-4 py-6 lg:px-8 lg:py-8">
+        <div className="rounded-[32px] bg-[var(--surface)] border border-[var(--border)] px-5 py-4 shadow-[0_24px_60px_rgba(15,23,42,0.08)] mb-6 backdrop-blur-xl">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--primary)]">V.P.S.</span>
+              <span className="text-xl font-bold tracking-tight text-[var(--body-text)]">V.P.S. Dental & Oral Care</span>
+            </div>
+            <div className="flex flex-1 items-center justify-end text-right text-sm text-[var(--text-muted)] xl:text-right">
               <div>
-                <h1 className="text-xl font-bold text-sky-600">{clientData.brandName}</h1>
-                <p className="text-xs text-gray-500">Professional Dental Care</p>
+                <p className="font-semibold text-[var(--body-text)]">Dr. {doctorName.split(' ')[0]}</p>
+                <p>Here’s your schedule and active bookings for today.</p>
               </div>
             </div>
-            <div className="relative w-96">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Find Patients or Appointments"
-                className="w-full pl-12 pr-4 py-2.5 bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
+            <div className="relative flex items-center gap-3 justify-end">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-strong)] text-[var(--body-text)] shadow-sm transition hover:bg-[var(--surface)]"
+                aria-label="Toggle theme"
+              >
+                {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              </button>
+              <button className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--primary)] text-white shadow-lg shadow-[rgba(56,189,248,0.2)] transition hover:bg-[var(--primary-strong)]" onClick={() => setIsUserMenuOpen((prev) => !prev)}>
+                S
+              </button>
+              {isUserMenuOpen && (
+                <div className="absolute right-0 top-16 z-10 w-48 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[0_18px_45px_rgba(15,23,42,0.12)]">
+                  <button onClick={handleSettings} className="flex w-full items-center gap-2 rounded-3xl px-4 py-3 text-left text-sm text-[var(--body-text)] transition hover:bg-[var(--surface-strong)]">
+                    <Settings className="h-4 w-4 text-[var(--primary)]" />
+                    Settings
+                  </button>
+                  <button onClick={handleLogout} className="mt-2 flex w-full items-center gap-2 rounded-3xl px-4 py-3 text-left text-sm text-[var(--body-text)] transition hover:bg-[var(--surface-strong)]">
+                    <LogOut className="h-4 w-4 text-[var(--primary)]" />
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 mr-4">
-              <div className="text-right">
-                <div className="text-sm font-semibold text-gray-800">{clientData.clientName}</div>
-                <div className="text-xs text-gray-500">Dental Surgeon</div>
-              </div>
-              <div className="w-10 h-10 bg-gradient-to-br from-sky-400 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
-                {clientData.clientName.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
-              </div>
-            </div>
-            <button className="relative hover:bg-gray-100 p-2 rounded-lg transition">
-              <Bell size={22} className="text-gray-600" />
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
           </div>
         </div>
-      </nav>
+        <div className="grid gap-6 xl:grid-cols-[1.75fr_0.85fr]">
+          <div className="space-y-6">
+            <div className="rounded-[40px] bg-[var(--surface)] p-6 shadow-[0_30px_90px_rgba(15,23,42,0.08)] transition-colors overflow-hidden">
+              <div className="grid gap-6 xl:grid-cols-[1.5fr_auto] xl:items-center">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-sm uppercase tracking-[0.3em] text-[var(--primary)]">Today's Patient Visits</p>
+                    <div className="flex items-end gap-3">
+                      <span className="text-[4.5rem] font-semibold leading-none text-[var(--body-text)]">{todayVisits}</span>
+                      <span className="text-sm text-[var(--text-muted)]">/person</span>
+                    </div>
+                    <p className="text-sm text-[var(--text-muted)]">Updated for Dr. {doctorName.split(' ')[0]}</p>
+                  </div>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-20 bg-white border-r border-gray-200 min-h-screen flex flex-col items-center py-8 gap-6 shadow-sm">
-          <button className="w-12 h-12 bg-gradient-to-br from-sky-500 to-cyan-600 rounded-2xl flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-all">
-            <Home size={24} />
-          </button>
-          <button className="w-12 h-12 hover:bg-sky-50 rounded-2xl flex items-center justify-center text-gray-600 hover:text-sky-600 transition-all">
-            <CalendarIcon size={24} />
-          </button>
-          <button className="w-12 h-12 hover:bg-sky-50 rounded-2xl flex items-center justify-center text-gray-600 hover:text-sky-600 transition-all">
-            <MessageSquare size={24} />
-          </button>
-          <button className="w-12 h-12 hover:bg-sky-50 rounded-2xl flex items-center justify-center text-gray-600 hover:text-sky-600 transition-all">
-            <Users size={24} />
-          </button>
-          <div className="flex-1"></div>
-          <button className="w-12 h-12 hover:bg-gray-100 rounded-2xl flex items-center justify-center text-gray-500 hover:text-gray-700 transition-all">
-            <Settings size={24} />
-          </button>
-          <button className="w-12 h-12 hover:bg-gray-100 rounded-2xl flex items-center justify-center text-gray-500 hover:text-gray-700 transition-all">
-            <HelpCircle size={24} />
-          </button>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 p-8">
-          {/* Greeting & Action */}
-          <div className="mb-8 flex items-center justify-between">
-            <h2 className="text-3xl">
-              Good Morning <span className="text-sky-600 dark:text-sky-400 font-bold">{clientData.clientName}</span> 👋
-            </h2>
-            <button
-              onClick={() => setIsBookingModalOpen(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-sky-500 to-cyan-600 text-white rounded-xl hover:from-sky-600 hover:to-cyan-700 transition shadow-lg hover:shadow-xl transform hover:scale-105"
-            >
-              <UserPlus size={20} />
-              <span className="font-semibold">New Patient Booking</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-3 gap-6">
-            {/* Left Column - Patient Visits */}
-            <div className="col-span-2 space-y-6">
-              {/* Today's Patient Visits Card */}
-              <div className="bg-gradient-to-br from-sky-100 via-cyan-50 to-blue-100 rounded-3xl p-8 shadow-lg border border-sky-200">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold mb-4 text-gray-800">Today's Patient Visits</h3>
-                    <div className="text-7xl font-bold mb-2 bg-gradient-to-r from-sky-600 to-cyan-600 bg-clip-text text-transparent">790</div>
-                    <div className="text-gray-600 text-sm font-medium">/person</div>
-
-                    <div className="flex gap-4 mt-6">
-                      <div className="bg-gradient-to-br from-sky-500 to-sky-600 rounded-2xl px-6 py-4 shadow-md hover:shadow-lg transition-shadow">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-white text-sm font-medium">New Patients</span>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-[28px] bg-[#E0F2FE] p-5 shadow-sm border border-[#bae6fd] transition-colors">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm text-[var(--text-muted)]">New Patients</p>
+                          <p className="mt-3 text-3xl font-semibold text-[var(--body-text)]">{newPatients}</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-white text-4xl font-bold">750</span>
-                          <span className="bg-white text-green-600 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow">
-                            51% 📈
-                          </span>
+                        <div className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">
+                          <ArrowUpRight className="h-4 w-4" />
+                          51%
                         </div>
                       </div>
-
-                      <div className="bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl px-6 py-4 shadow-md hover:shadow-lg transition-shadow">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-white text-sm font-medium">Returning Patients</span>
+                    </div>
+                    <div className="rounded-[28px] bg-[#FEE2E2] p-5 shadow-sm border border-[#fecaca] transition-colors">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm text-[var(--text-muted)]">Returning Patients</p>
+                          <p className="mt-3 text-3xl font-semibold text-[var(--body-text)]">{returningPatients}</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-white text-4xl font-bold">40</span>
-                          <span className="bg-white text-red-600 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow">
-                            51% 📉
-                          </span>
+                        <div className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1 text-sm font-semibold text-rose-700">
+                          <ArrowDownRight className="h-4 w-4" />
+                          51%
                         </div>
                       </div>
                     </div>
                   </div>
-
-                  <div className="w-64 h-64 relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-sky-200 to-cyan-200 rounded-full opacity-30 blur-2xl"></div>
-                    <div className="relative text-9xl">🦷</div>
-                  </div>
+                </div>
+                <div className="relative overflow-hidden rounded-[36px] bg-[var(--surface-strong)] shadow-sm">
+                  <img
+                    src="https://images.unsplash.com/photo-1611470985607-1f168365b5c6?auto=format&fit=crop&w=800&q=80"
+                    alt="Dental graphic"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
               </div>
+            </div>
 
-              {/* Patient List and Consultation */}
-              <div className="bg-white rounded-3xl p-6 shadow-md border border-gray-100">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold text-gray-800">Patient List</h3>
-                  <select className="px-4 py-2 border-2 border-gray-200 rounded-xl text-sm font-medium hover:border-sky-300 transition focus:outline-none focus:ring-2 focus:ring-sky-500">
-                    <option>Today</option>
-                    <option>This Week</option>
-                    <option>This Month</option>
-                  </select>
-                  <h3 className="text-xl font-semibold text-gray-800">Consultation</h3>
+            <div className="rounded-[32px] bg-[var(--surface)] p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] transition-colors">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-[var(--body-text)]">Patient List</h2>
                 </div>
-
-                <div className="grid grid-cols-2 gap-6">
-                  {/* Patient List */}
-                  <div className="space-y-3">
-                    {patients.map(patient => (
-                      <div key={patient.id} className="flex items-center justify-between p-4 border-2 border-gray-200 rounded-2xl hover:border-sky-300 hover:bg-sky-50 transition-all">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-gradient-to-br from-sky-100 to-cyan-100 rounded-full flex items-center justify-center text-2xl shadow-sm">
-                            {patient.avatar}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-gray-800">{patient.name}</div>
-                            <div className={`text-sm font-medium ${patient.color || 'text-green-600'}`}>{patient.type}</div>
-                          </div>
-                        </div>
-                        <div className="px-4 py-2 bg-gradient-to-r from-gray-800 to-gray-900 text-white rounded-xl text-sm font-semibold shadow-md">
-                          {patient.time}
-                        </div>
-                      </div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-strong)] px-4 py-2 text-sm text-[var(--body-text)] shadow-sm">
+                  <span className="text-[var(--text-muted)]">{bookingFilter}</span>
+                  <select
+                    value={bookingFilter}
+                    onChange={(e) => setBookingFilter(e.target.value)}
+                    className="bg-transparent text-sm text-[var(--body-text)] outline-none"
+                  >
+                    {filterOptions.map((option) => (
+                      <option key={option} value={option}>{option}</option>
                     ))}
-                  </div>
-
-                  {/* Consultation Details */}
-                  <div>
-                    <div className="flex items-center gap-4 mb-6 pb-4 border-b">
-                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-3xl">
-                        👨
-                      </div>
-                      <div>
-                        <div className="font-bold text-lg">{selectedPatient.name}</div>
-                        <div className="text-gray-500 text-sm">{selectedPatient.gender} - {selectedPatient.age} Years old</div>
-                      </div>
-                      <button className="ml-auto">
-                        <MoreHorizontal className="text-gray-400" />
-                      </button>
-                    </div>
-
-                    <div className="flex gap-4 mb-6 justify-center">
-                      {selectedPatient.services.map((service, idx) => (
-                        <div key={idx} className="text-center">
-                          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-3xl mb-2">
-                            {service.icon}
-                          </div>
-                          <div className="text-xs text-gray-600">{service.name}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="space-y-4 text-sm">
-                      <div>
-                        <div className="text-gray-500 mb-1">Last Checked</div>
-                        <div className="font-medium">{selectedPatient.lastChecked.doctor} on {selectedPatient.lastChecked.date}</div>
-                        <div className="text-blue-500">Prescription {selectedPatient.lastChecked.prescription}</div>
-                      </div>
-
-                      <div>
-                        <div className="text-gray-500 mb-1">Observation</div>
-                        <div className="text-gray-700">{selectedPatient.observation}</div>
-                      </div>
-
-                      <div>
-                        <div className="text-gray-500 mb-1">Prescription</div>
-                        <div className="text-gray-700 whitespace-pre-line">{selectedPatient.prescription}</div>
-                      </div>
-                    </div>
-                  </div>
+                  </select>
                 </div>
+              </div>
+              <div className="mt-6 space-y-4">
+                {selectedFilterPatients.length > 0 ? (
+                  selectedFilterPatients.slice(0, 4).map(patient => (
+                    <div key={patient.id} className="flex items-center justify-between gap-4 rounded-[32px] border border-[var(--border)] bg-[var(--surface-strong)] p-4 shadow-sm transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--surface)] text-lg font-semibold text-[var(--primary)]">
+                          {patient.name.split(' ').map((part: string) => part[0]).join('').slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="text-base font-semibold text-[var(--body-text)]">{patient.name}</p>
+                          <p className="text-sm font-medium text-emerald-600">{patient.badge}</p>
+                        </div>
+                      </div>
+                      <div className="rounded-full bg-[var(--body-bg)] px-4 py-2 text-sm font-semibold text-[var(--body-text)] shadow-sm">{patient.time}</div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-[28px] bg-[var(--surface-strong)] p-6 text-center text-sm text-[var(--text-muted)]">No bookings match this filter.</div>
+                )}
               </div>
             </div>
 
-            {/* Right Column - Schedule & Notes */}
-            <div className="space-y-6">
-              {/* Calendar */}
-              <div className="bg-white rounded-3xl p-6 shadow-md border border-gray-100">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-gray-800">Your Schedule</h3>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
-                      className="p-1.5 hover:bg-gray-100 rounded-lg transition"
-                    >
-                      <ChevronLeft size={20} className="text-gray-700" />
-                    </button>
-                    <button
-                      onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
-                      className="p-1.5 hover:bg-gray-100 rounded-lg transition"
-                    >
-                      <ChevronRight size={20} className="text-gray-700" />
-                    </button>
-                  </div>
+            <div className="rounded-[32px] bg-[var(--surface)] p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] transition-colors">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-[var(--body-text)]">Consultation</h2>
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">Guy Hawkins • Male • 28 Years old</p>
                 </div>
-
-                <div className="text-base font-semibold text-gray-700 mb-4">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</div>
-
-                <div className="grid grid-cols-7 gap-2 mb-3">
-                  {dayNames.map(day => (
-                    <div key={day} className="text-center text-xs text-gray-600 font-semibold py-2">{day}</div>
-                  ))}
+                <button className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-strong)] text-[var(--text-muted)] transition hover:bg-[var(--surface)]">
+                  <MoreHorizontal className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="mt-6 flex items-center gap-4 rounded-[28px] bg-[var(--surface-strong)] p-4 shadow-sm transition-colors">
+                <div className="h-16 w-16 rounded-full border border-[var(--border)] overflow-hidden bg-[var(--surface)]">
+                  <img
+                    src="https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=200&q=80"
+                    alt="Guy Hawkins"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
-
-                <div className="grid grid-cols-7 gap-2">
-                  {getDaysInMonth().map((day, idx) => {
-                    const hasApt = hasAppointments(day)
-                    const today = isToday(day)
-                    return (
-                      <div
-                        key={idx}
-                        className={`aspect-square flex items-center justify-center text-sm rounded-xl font-medium transition-all
-                          ${day === null ? 'invisible' : 'hover:bg-sky-50 cursor-pointer border border-gray-100'}
-                          ${hasApt || today ? 'bg-gradient-to-br from-sky-600 to-cyan-600 text-white font-bold shadow-md hover:shadow-lg border-0' : 'text-gray-700'}
-                          ${today && !hasApt ? 'ring-2 ring-sky-400' : ''}
-                        `}
-                      >
-                        {day}
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <div className="mt-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-gray-800">Upcoming</h4>
-                    <button className="text-sky-600 text-sm font-medium hover:text-sky-700">View All</button>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-sky-50 to-cyan-50 rounded-xl border border-sky-200 hover:shadow-md transition-shadow">
-                    <div className="w-11 h-11 bg-gradient-to-br from-sky-500 to-cyan-600 rounded-lg flex items-center justify-center shadow-md">
-                      <CalendarIcon size={22} className="text-white" />
-                    </div>
-                    <div>
-                      <div className="font-semibold text-sm text-gray-800">Monthly doctor's meet</div>
-                      <div className="text-xs text-gray-600 mt-0.5">12 October, 2025 | 08:00 PM</div>
-                    </div>
-                  </div>
+                <div>
+                  <p className="font-semibold text-[var(--body-text)]">Guy Hawkins</p>
+                  <p className="text-sm text-[var(--text-muted)]">Male - 28 Years old</p>
                 </div>
               </div>
-
-              {/* Dentist Notes */}
-              <div className="bg-gradient-to-br from-sky-100 via-cyan-50 to-blue-100 rounded-3xl p-6 shadow-md border border-sky-200">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-gray-800">Dentist Notes</h3>
-                  <button className="text-sm bg-white border-2 border-sky-500 text-sky-600 px-4 py-2 rounded-lg font-medium hover:bg-sky-50 transition shadow-sm">+ Add new note</button>
+              <div className="mt-6 grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-[28px] bg-[var(--surface-strong)] p-4 shadow-sm transition-colors">
+                  <Sparkles className="mx-auto mb-2 h-5 w-5 text-[var(--primary)]" />
+                  <p className="text-sm font-semibold text-[var(--body-text)]">Braces</p>
                 </div>
-                <div className="flex items-center justify-center py-8">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-sky-300 to-cyan-300 rounded-full opacity-20 blur-2xl"></div>
-                    <div className="relative text-8xl">😊🦷</div>
-                  </div>
+                <div className="rounded-[28px] bg-[var(--surface-strong)] p-4 shadow-sm transition-colors">
+                  <Smile className="mx-auto mb-2 h-5 w-5 text-[var(--primary)]" />
+                  <p className="text-sm font-semibold text-[var(--body-text)]">Whitening</p>
+                </div>
+                <div className="rounded-[28px] bg-[var(--surface-strong)] p-4 shadow-sm transition-colors">
+                  <Grid className="mx-auto mb-2 h-5 w-5 text-[var(--primary)]" />
+                  <p className="text-sm font-semibold text-[var(--body-text)]">Cavity</p>
+                </div>
+              </div>
+              <div className="mt-6 border-t border-[var(--border)] pt-4 text-sm text-[var(--text-muted)]">
+                <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3">
+                  <span className="font-semibold text-[var(--body-text)]">Last Checked</span>
+                  <span>Dr Smith on 10 October 2023 • Prescription <span className="text-[var(--primary)]">#9C672QA1</span></span>
+                  <span className="font-semibold text-[var(--body-text)]">Observation</span>
+                  <span>Multiple cavities detected in molars; slight enamel erosion observed.</span>
+                  <span className="font-semibold text-[var(--body-text)]">Prescription</span>
+                  <span>Fluoride toothpaste • Use twice daily • Dental filling appointment scheduled for 20 October 2023.</span>
                 </div>
               </div>
             </div>
           </div>
-        </main>
-
-        {/* Footer */}
-        <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto transition-colors duration-300">
-          <div className="max-w-7xl mx-auto px-6 py-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Clinic Info */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-sky-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                    <span className="text-white text-xl">🦷</span>
+          <aside className="space-y-6 xl:sticky xl:top-6">
+            <div className="rounded-[32px] bg-[var(--surface)] p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] transition-colors">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-lg font-semibold text-[var(--body-text)]">Your Schedule</h2>
+              </div>
+              <div className="mt-5 flex items-center justify-between rounded-full border border-[var(--border)] bg-[var(--surface-strong)] p-3 text-[var(--text-muted)]">
+                <span>{currentMonthName} {currentDate.getFullYear()}</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} className="rounded-full p-2 transition hover:bg-[var(--surface)]"><ChevronLeft className="h-4 w-4" /></button>
+                  <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))} className="rounded-full p-2 transition hover:bg-[var(--surface)]"><ChevronRight className="h-4 w-4" /></button>
+                </div>
+              </div>
+              <div className="mt-6 grid grid-cols-7 gap-2 text-center text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                {['SUN','MON','TUE','WED','THU','FRI','SAT'].map(day => <div key={day}>{day}</div>)}
+              </div>
+              <div className="mt-3 grid grid-cols-7 gap-2 text-center text-sm">
+                {getDaysInMonth().map((day, idx) => {
+                  const isBlank = day === null
+                  const today = isToday(day)
+                  const appointment = hasAppointments(day)
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex h-10 items-center justify-center rounded-2xl ${isBlank ? 'invisible' : 'transition'} ${appointment ? 'bg-[var(--primary)] text-white shadow-lg shadow-[rgba(56,189,248,0.15)]' : today ? 'border border-[var(--primary)] bg-[var(--surface-muted)] text-[var(--body-text)] font-semibold' : 'bg-[var(--surface-strong)] text-[var(--text-muted)]'}`}
+                    >
+                      {day}
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="mt-6 rounded-[28px] bg-[var(--surface-strong)] p-4 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--primary)] text-white">
+                    <CalendarIcon className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-800 dark:text-gray-100">{clientData.brandName}</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Professional Dental Care</p>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Providing quality dental care with state-of-the-art technology and experienced professionals.
-                </p>
-              </div>
-
-              {/* Contact Info */}
-              <div>
-                <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-3">Contact Us</h4>
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <MapPin size={16} className="text-sky-600 mt-0.5 flex-shrink-0" />
-                    <span>128/31, F Block Kidwai Nagar Kanpur, Near Matadeen Hp Petrol Pump, Geeta Park, Kidwai Nagar, Kanpur-208011, Uttar Pradesh</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Phone size={16} className="text-sky-600" />
-                    <span>+91-XXXXXXXXXX</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Mail size={16} className="text-sky-600" />
-                    <span>contact@vpsdental.com</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Working Hours */}
-              <div>
-                <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-3">Working Hours</h4>
-                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                  <div className="flex justify-between">
-                    <span>Monday - Friday:</span>
-                    <span className="font-medium">8:00 AM - 8:00 PM</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Saturday:</span>
-                    <span className="font-medium">9:00 AM - 6:00 PM</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Sunday:</span>
-                    <span className="font-medium">Closed</span>
+                    <p className="text-sm font-semibold text-[var(--body-text)]">{upcomingAppointment.title}</p>
+                    <p className="mt-1 text-sm text-[var(--text-muted)]">{upcomingAppointment.date} • {upcomingAppointment.time}</p>
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Copyright */}
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                © 2026 {clientData.brandName}. All rights reserved. | Powered by AgentFleet AI
-              </p>
+            <div className="rounded-[32px] bg-[var(--surface)] p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] transition-colors">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-lg font-semibold text-[var(--body-text)]">Dentist Notes</h2>
+                <button className="rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2 text-sm text-[var(--text-muted)] transition hover:bg-[var(--surface)]">+ Add new note</button>
+              </div>
+              <div className="mt-6 rounded-[28px] bg-[var(--surface-strong)] p-4 text-center transition-colors">
+                <img
+                  src="https://images.unsplash.com/photo-1606813902373-2fa7d690c5d2?auto=format&fit=crop&w=500&q=80"
+                  alt="Tooth illustration"
+                  className="mx-auto h-36 w-full max-w-[220px] rounded-[28px] object-cover"
+                />
+              </div>
+            </div>
+          </aside>
+        </div>
+        <BookingModal isOpen={isBookingModalOpen} onClose={() => setIsBookingModalOpen(false)} onSubmit={handleBookingSubmit} />
+        <footer className="mt-10 rounded-[32px] bg-[var(--surface)] p-6 text-[var(--text-muted)] shadow-[0_24px_80px_rgba(15,23,42,0.18)] transition-colors">
+          <div className="grid gap-4 md:grid-cols-[1.2fr_auto] md:items-center">
+            <div>
+              <p className="text-sm uppercase tracking-[0.24em] text-[var(--primary)]">Clinic details</p>
+              <p className="mt-3 text-base font-semibold text-[var(--body-text)]">Dr. Rajeev Pratap Singh</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">{clinicAddress}</p>
+            </div>
+            <div className="rounded-[28px] bg-[var(--surface-strong)] px-5 py-4 text-sm text-[var(--text-muted)] transition-colors">
+              <p className="font-semibold text-[var(--body-text)]">Clinic Management Dashboard</p>
+              <p className="mt-2 text-[var(--text-muted)]">Keep patient appointments, schedule follow-ups, and review daily performance at a glance.</p>
             </div>
           </div>
         </footer>
       </div>
-
-      {/* Booking Modal */}
-      <BookingModal
-        isOpen={isBookingModalOpen}
-        onClose={() => setIsBookingModalOpen(false)}
-        onSubmit={handleBookingSubmit}
-      />
     </div>
   )
 }

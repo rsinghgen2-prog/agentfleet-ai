@@ -22,7 +22,7 @@ export const CLIENTS: Client[] = [
     brandName: 'V.P.S. Dental & Oral Care',
     dashboardType: 'dental',
     primaryColor: '#0EA5E9', // Sky blue
-    address: '128/31, F Block Kidwai Nagar Kanpur, Near Matadeen Hp Petrol Pump, Geeta Park, Kidwai Nagar, Kanpur-208011, Uttar Pradesh'
+    address: '128/31, F Block Kidwai Nagar, Kanpur, Near Matadeen HP Petrol Pump, Geeta Park, Kidwai Nagar, Kanpur-208011, Uttar Pradesh, India'
   }
 ]
 

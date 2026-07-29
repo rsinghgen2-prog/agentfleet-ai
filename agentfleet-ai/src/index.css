@@ -1,22 +1,52 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
+:root {
+  color-scheme: light;
+  --body-bg: #f4f8fb;
+  --body-text: #0f172a;
+  --surface: #ffffff;
+  --surface-strong: #f8fafc;
+  --surface-muted: #e2e8f0;
+  --border: rgba(148, 163, 184, 0.28);
+  --primary: #0f766e;
+  --primary-strong: #14b8a6;
+  --accent: #38bdf8;
+  --text-muted: #475569;
+  --glass: rgba(255, 255, 255, 0.72);
+}
+
+.dark {
+  color-scheme: dark;
+  --body-bg: #071426;
+  --body-text: #e2e8f0;
+  --surface: #0f172a;
+  --surface-strong: #111827;
+  --surface-muted: #1e293b;
+  --border: rgba(148, 163, 184, 0.12);
+  --primary: #38bdf8;
+  --primary-strong: #0ea5e9;
+  --accent: #67e8f9;
+  --text-muted: #94a3b8;
+  --glass: rgba(15, 23, 42, 0.68);
+}
+
 html {
   scroll-behavior: smooth;
 }
 
 body {
-  background-color: #0A0F1C;
-  color: white;
+  background-color: var(--body-bg);
+  color: var(--body-text);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   margin: 0;
   padding: 0;
 }
 
 .glass-card {
-  backdrop-filter: blur(16px);
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(18px);
+  background-color: var(--glass);
+  border: 1px solid var(--border);
   border-radius: 1rem;
 }
 
@@ -24,7 +54,80 @@ body {
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  background-image: linear-gradient(to right, #4F46E5, #8B5CF6, #06B6D4);
+  background-image: linear-gradient(90deg, #0f766e, #22d3ee, #38bdf8);
+}
+
+.app-shell {
+  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(248,250,252,0.95));
+  border-radius: 32px;
+  box-shadow: 0 20px 50px rgba(2,6,23,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+  padding: 20px;
+  backdrop-filter: blur(6px);
+}
+
+.search-input-custom {
+  border-radius: 9999px;
+  padding-left: 3rem;
+  padding-right: 1rem;
+}
+
+.card-soft {
+  border-radius: 20px;
+}
+
+.sidebar-pill {
+  background: linear-gradient(180deg, #ffffff, #f7fbff);
+  border-radius: 18px;
+}
+
+.hero-card {
+  background: var(--surface);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+
+.pill {
+  border-radius: 14px;
+  padding: 0.5rem 0.75rem;
+}
+
+.small-stat {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.right-column-fixed {
+  width: 100%;
+}
+
+@media (min-width: 1280px) {
+  .right-column-fixed {
+    width: 20rem;
+    flex-shrink: 0;
+  }
+}
+
+.card-soft { border-radius: 18px; }
+
+.footer-shell {
+  background: linear-gradient(180deg, #0f172a 0%, #071029 100%);
+  color: rgba(255,255,255,0.95);
+  border-radius: 20px;
+  padding: 2rem;
+}
+.footer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.footer-column h4 { color: rgba(255,255,255,0.95); font-weight: 700; }
+.footer-cta { background: linear-gradient(90deg,#06b6d4,#3b82f6); color: white; padding: 0.75rem 1rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(59,130,246,0.18); }
+.footer-links a { color: rgba(255,255,255,0.85); text-decoration: none; display:block; margin-bottom:0.4rem; }
+.footer-legal { color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 1rem; }
+.social-icon { width: 36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:10px; background: rgba(255,255,255,0.06); margin-right:0.5rem; }
+
+@media (max-width: 768px) {
+  .footer-shell { padding: 1.25rem; }
+  .footer-column { margin-bottom: 1rem; }
 }
 
 .dental-stitch-app {

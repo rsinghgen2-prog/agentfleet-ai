@@ -14,12 +14,8 @@ import EnhancedDashboard from './pages/EnhancedDashboard'
 import DentalDashboard from './pages/DentalDashboard'
 import IndustryDashboard from './pages/IndustryDashboard'
 import AdminDashboard from './pages/AdminDashboard'
-import DentalClientStitchDashboard from './pages/DentalClientStitchDashboard'
-import DentalClientPatients from './pages/DentalClientPatients'
-import DentalClientSchedule from './pages/DentalClientSchedule'
-import DentalClientInventory from './pages/DentalClientInventory'
-import DentalClientSettings from './pages/DentalClientSettings'
-import DentalClientShell from './components/dental/DentalClientShell'
+import DentalClientDashboard from './pages/DentalClientDashboard'
+import Settings from './pages/Settings'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -36,7 +32,7 @@ function App() {
   return (
     <LanguageProvider>
       <Router>
-        <div className="min-h-screen bg-background overflow-x-hidden">
+        <div className="min-h-screen bg-[var(--body-bg)] text-[var(--body-text)] overflow-x-hidden">
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={
@@ -81,13 +77,16 @@ function App() {
               </ProtectedRoute>
             } />
 
-            <Route path="/dental-client" element={<ProtectedRoute><DentalClientShell /></ProtectedRoute>}>
-              <Route index element={<DentalClientStitchDashboard />} />
-              <Route path="patients" element={<DentalClientPatients />} />
-              <Route path="schedule" element={<DentalClientSchedule />} />
-              <Route path="inventory" element={<DentalClientInventory />} />
-              <Route path="settings" element={<DentalClientSettings />} />
-            </Route>
+            <Route path="/dental-client" element={
+              <ProtectedRoute>
+                <DentalClientDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            } />
 
             <Route path="/automation" element={
               <ProtectedRoute>

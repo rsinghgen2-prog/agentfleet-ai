@@ -11,4 +11,7 @@ export default defineConfig({
       'localhost',
     ],
   },
+  preview: {
+    host: true,
+  },
 })
