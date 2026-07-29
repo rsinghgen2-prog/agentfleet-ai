@@ -14,7 +14,12 @@ import EnhancedDashboard from './pages/EnhancedDashboard'
 import DentalDashboard from './pages/DentalDashboard'
 import IndustryDashboard from './pages/IndustryDashboard'
 import AdminDashboard from './pages/AdminDashboard'
-import DentalClientDashboard from './pages/DentalClientDashboard'
+import DentalClientStitchDashboard from './pages/DentalClientStitchDashboard'
+import DentalClientPatients from './pages/DentalClientPatients'
+import DentalClientSchedule from './pages/DentalClientSchedule'
+import DentalClientInventory from './pages/DentalClientInventory'
+import DentalClientSettings from './pages/DentalClientSettings'
+import DentalClientShell from './components/dental/DentalClientShell'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -76,11 +81,13 @@ function App() {
               </ProtectedRoute>
             } />
 
-            <Route path="/dental-client" element={
-              <ProtectedRoute>
-                <DentalClientDashboard />
-              </ProtectedRoute>
-            } />
+            <Route path="/dental-client" element={<ProtectedRoute><DentalClientShell /></ProtectedRoute>}>
+              <Route index element={<DentalClientStitchDashboard />} />
+              <Route path="patients" element={<DentalClientPatients />} />
+              <Route path="schedule" element={<DentalClientSchedule />} />
+              <Route path="inventory" element={<DentalClientInventory />} />
+              <Route path="settings" element={<DentalClientSettings />} />
+            </Route>
 
             <Route path="/automation" element={
               <ProtectedRoute>
