@@ -4,7 +4,7 @@ import { X, User, Phone, Mail, Calendar, Clock, FileText, CheckCircle } from 'lu
 interface BookingModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (bookingData: BookingFormData) => void
+  onSubmit: (bookingData: BookingFormData) => Promise<void> | void
 }
 
 export interface BookingFormData {
@@ -39,6 +39,7 @@ export const BookingModal = ({ isOpen, onClose, onSubmit }: BookingModalProps) =
   const [errors, setErrors] = useState<Partial<BookingFormData>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const appointmentTypes = [
     'Checkup', 'Cleaning', 'Cavity Filling', 'Root Canal', 
@@ -73,24 +74,26 @@ export const BookingModal = ({ isOpen, onClose, onSubmit }: BookingModalProps) =
     if (!validateForm()) return
 
     setIsSubmitting(true)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    onSubmit(formData)
-    setShowSuccess(true)
-    
-    // Reset form after 2 seconds
-    setTimeout(() => {
-      setShowSuccess(false)
+    setSubmitError('')
+
+    try {
+      await onSubmit(formData)
+      setShowSuccess(true)
+
+      window.setTimeout(() => {
+        setShowSuccess(false)
+        setFormData({
+          firstName: '', lastName: '', phone: '', email: '', dateOfBirth: '',
+          gender: 'Male', appointmentDate: '', appointmentTime: '',
+          appointmentType: 'Checkup', reason: '', notes: ''
+        })
+        onClose()
+      }, 2000)
+    } catch (reason) {
+      setSubmitError(reason instanceof Error ? reason.message : 'Unable to book this appointment')
+    } finally {
       setIsSubmitting(false)
-      setFormData({
-        firstName: '', lastName: '', phone: '', email: '', dateOfBirth: '',
-        gender: 'Male', appointmentDate: '', appointmentTime: '',
-        appointmentType: 'Checkup', reason: '', notes: ''
-      })
-      onClose()
-    }, 2000)
+    }
   }
 
   const handleChange = (field: keyof BookingFormData, value: string) => {
@@ -136,6 +139,7 @@ export const BookingModal = ({ isOpen, onClose, onSubmit }: BookingModalProps) =
             </div>
           </div>
         )}
+        {submitError && <div role="alert" className="mx-6 mt-6 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-700">{submitError}</div>}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">

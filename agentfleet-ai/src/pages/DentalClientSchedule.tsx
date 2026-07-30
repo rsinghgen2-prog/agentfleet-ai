@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { CalendarPlus, ChevronLeft, ChevronRight, Clock3, Plus } from 'lucide-react'
 import { useDentalDashboardData } from '../hooks/useDentalDashboardData'
 import { BookingModal, type BookingFormData } from '../components/BookingModal'
-import { DashboardService } from '../services/dashboardService'
+import { DashboardService, type Appointment } from '../services/dashboardService'
 
 const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00']
 const weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI']
@@ -10,10 +10,14 @@ const weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI']
 export default function DentalClientSchedule() {
   const { data, refresh } = useDentalDashboardData()
   const [bookingOpen, setBookingOpen] = useState(false)
+  const [appointments, setAppointments] = useState<Appointment[]>([])
   const today = new Date(data?.currentDate.today || new Date())
   const weekDays = weekdays.map((label, index) => { const date = new Date(today); date.setDate(today.getDate() - ((today.getDay() + 6) % 7) + index); return { label, date } })
-  const appointments = data?.todaysAppointments || []
-  const handleBooking = async (booking: BookingFormData) => { await DashboardService.createBooking(booking); await refresh() }
+  const from = weekDays[0].date.toISOString().split('T')[0]
+  const to = weekDays[4].date.toISOString().split('T')[0]
+  const loadAppointments = useCallback(async () => { try { setAppointments(await DashboardService.getAppointments(from, to)) } catch { setAppointments([]) } }, [from, to])
+  useEffect(() => { void loadAppointments() }, [loadAppointments])
+  const handleBooking = async (booking: BookingFormData) => { await DashboardService.createBooking(booking); await refresh(); await loadAppointments() }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] px-4 py-6 pb-24 sm:px-6 lg:px-8"><div className="mb-7 flex flex-col justify-between gap-4 lg:flex-row lg:items-center"><div><h1 className="text-2xl font-bold text-[#151c23] sm:text-3xl">Appointment Schedule</h1><div className="mt-2 flex items-center gap-3 text-xs text-[#424752]"><span className="flex items-center gap-1 font-bold text-green-600"><span className="h-1.5 w-1.5 rounded-full bg-green-600" /> Clinic Open</span><span>08:00 AM - 06:00 PM</span></div></div><div className="flex items-center gap-2"><div className="flex rounded-xl bg-[#e2e9f2] p-1 text-xs font-bold"><button className="rounded-lg bg-white px-4 py-2 shadow-sm">Week</button><button className="px-4 py-2 text-[#424752]">Day</button><button className="px-4 py-2 text-[#424752]">Month</button></div><button onClick={() => setBookingOpen(true)} className="flex items-center gap-2 rounded-xl bg-[#005db6] px-4 py-3 text-xs font-bold text-white shadow-md"><Plus size={17} /><span className="hidden sm:inline">Quick Add</span></button></div></div>
