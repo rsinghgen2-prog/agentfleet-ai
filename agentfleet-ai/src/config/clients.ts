@@ -25,6 +25,19 @@ export const CLIENTS: Client[] = [
     dashboardType: 'dental',
     primaryColor: '#0EA5E9', // Sky blue
     address: '128/31, F Block Kidwai Nagar, Kanpur, Near Matadeen HP Petrol Pump, Geeta Park, Kidwai Nagar, Kanpur-208011, Uttar Pradesh, India'
+  },
+  {
+    email: 'rsingh.niit02@gmail.com',
+    password: import.meta.env.VITE_DEMO_ABC_PASSWORD || '',
+    clientName: 'Dr. Abhijeej Baghel',
+    domain: 'Dental Clinic',
+    subdomain: 'Dental',
+    tenantSlug: 'abc-dental',
+    brandName: 'ABC Dental Care',
+    dashboardType: 'dental',
+    primaryColor: '#0f766e',
+    logo: '🦷',
+    address: 'abcd, satna, mp 485447'
   }
 ]
 

@@ -7,6 +7,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       SEED_PASSWORD: ${SEED_PASSWORD:?Set SEED_PASSWORD in .env}
+      ABC_SEED_PASSWORD: ${ABC_SEED_PASSWORD:?Set ABC_SEED_PASSWORD in .env}
     ports:
       - "5432:5432"
     volumes:
