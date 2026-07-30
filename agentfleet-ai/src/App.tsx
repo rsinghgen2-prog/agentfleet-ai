@@ -14,15 +14,29 @@ import EnhancedDashboard from './pages/EnhancedDashboard'
 import DentalDashboard from './pages/DentalDashboard'
 import IndustryDashboard from './pages/IndustryDashboard'
 import AdminDashboard from './pages/AdminDashboard'
-import DentalClientDashboard from './pages/DentalClientDashboard'
+import DentalClientStitchDashboard from './pages/DentalClientStitchDashboard'
+import DentalClientPatients from './pages/DentalClientPatients'
+import DentalClientSchedule from './pages/DentalClientSchedule'
+import DentalClientInventory from './pages/DentalClientInventory'
+import DentalClientSettings from './pages/DentalClientSettings'
+import DentalClientShell from './components/dental/DentalClientShell'
 import Settings from './pages/Settings'
 
+type UserType = 'client' | 'super-admin' | 'registered-user'
+
 // Protected Route Component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+const ProtectedRoute = ({ children, allowedUserTypes }: { children: React.ReactNode; allowedUserTypes?: UserType[] }) => {
   const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
+  const userType = localStorage.getItem('userType') as UserType | null
 
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />
+  }
+
+  if (allowedUserTypes && (!userType || !allowedUserTypes.includes(userType))) {
+    if (userType === 'client') return <Navigate to="/dental-client" replace />
+    if (userType === 'super-admin') return <Navigate to="/dashboard" replace />
+    return <Navigate to="/admin-dashboard" replace />
   }
 
   return <>{children}</>
@@ -66,7 +80,7 @@ function App() {
             } />
 
             <Route path="/dental-dashboard" element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedUserTypes={['super-admin']}>
                 <DentalDashboard />
               </ProtectedRoute>
             } />
@@ -77,11 +91,13 @@ function App() {
               </ProtectedRoute>
             } />
 
-            <Route path="/dental-client" element={
-              <ProtectedRoute>
-                <DentalClientDashboard />
-              </ProtectedRoute>
-            } />
+            <Route path="/dental-client" element={<ProtectedRoute allowedUserTypes={['client']}><DentalClientShell /></ProtectedRoute>}>
+              <Route index element={<DentalClientStitchDashboard />} />
+              <Route path="patients" element={<DentalClientPatients />} />
+              <Route path="schedule" element={<DentalClientSchedule />} />
+              <Route path="inventory" element={<DentalClientInventory />} />
+              <Route path="settings" element={<DentalClientSettings />} />
+            </Route>
             <Route path="/settings" element={
               <ProtectedRoute>
                 <Settings />

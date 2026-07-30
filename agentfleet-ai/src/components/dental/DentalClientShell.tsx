@@ -24,6 +24,10 @@ export default function DentalClientShell() {
   const logout = () => {
     localStorage.removeItem('isLoggedIn')
     localStorage.removeItem('clientData')
+    localStorage.removeItem('userType')
+    localStorage.removeItem('currentUser')
+    localStorage.removeItem('isSuperAdmin')
+    sessionStorage.clear()
     navigate('/login')
   }
 
