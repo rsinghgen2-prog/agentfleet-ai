@@ -1,15 +1,25 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Mail, Lock, ArrowLeft, Sparkles, AlertCircle, Check } from 'lucide-react'
+import { Mail, Lock, ArrowLeft, Sparkles, AlertCircle, Check, Moon, Sun } from 'lucide-react'
 import { SUPER_ADMIN, validateSuperAdmin } from '../config/superAdmin'
 import { getClientByEmail, validateClient } from '../config/clients'
+import { useTheme } from '../context/ThemeContext'
 
 const DEMO_MODE = import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === 'true'
 const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '')
 
+const getAuthErrorMessage = (reason: unknown) => {
+  const message = reason instanceof Error ? reason.message : 'Unable to reach authentication service'
+  if (/failed to fetch|networkerror|load failed/i.test(message)) {
+    return 'Authentication service is unreachable. Configure VITE_AUTH_API_URL for this deployment and verify the auth service is online.'
+  }
+  return message
+}
+
 const Login = () => {
   const navigate = useNavigate()
+  const { isDark, toggleTheme } = useTheme()
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -89,7 +99,7 @@ const Login = () => {
         }
       } catch (authError) {
         if (!DEMO_MODE) {
-          setError(authError instanceof Error ? authError.message : 'Unable to reach authentication service')
+          setError(getAuthErrorMessage(authError))
           return
         }
       }
@@ -131,7 +141,7 @@ const Login = () => {
 
     // Set login session
     localStorage.setItem('isLoggedIn', 'true')
-    localStorage.setItem('currentUser', formData.email)
+    localStorage.setItem('currentUser', email)
     localStorage.setItem('userType', 'registered-user')
     localStorage.removeItem('isSuperAdmin')
 
@@ -146,15 +156,24 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-20">
+    <div className="min-h-screen bg-[var(--body-bg)] text-[var(--body-text)] flex items-center justify-center px-4 py-20">
       <div className="max-w-md w-full">
-        {/* Back Button */}
-        <button
-          onClick={() => navigate('/')}
-          className="text-gray-400 hover:text-white mb-6 flex items-center gap-2 transition-colors"
-        >
-          <ArrowLeft size={20} /> Back to Home
-        </button>
+        <div className="mb-6 flex items-center justify-between">
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 text-[var(--text-muted)] transition-colors hover:text-[var(--body-text)]"
+          >
+            <ArrowLeft size={20} /> Back to Home
+          </button>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="rounded-full border border-[var(--border)] bg-[var(--surface)] p-2.5 text-[var(--body-text)] shadow-sm transition hover:border-[var(--primary)]"
+          >
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
 
         {/* Header */}
         <motion.div
@@ -168,7 +187,7 @@ const Login = () => {
               Welcome <span className="gradient-text">Back</span>
             </h1>
           </div>
-          <p className="text-gray-400 text-lg">
+          <p className="text-[var(--text-muted)] text-lg">
             Sign in to your SMS Automation account
           </p>
         </motion.div>
@@ -196,14 +215,14 @@ const Login = () => {
             <div>
               <label className="block text-sm font-semibold mb-2">Email Address</label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[var(--text-muted)]" size={20} />
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
                   placeholder="john@example.com"
-                  className="w-full pl-12 pr-4 py-3 glass-card rounded-lg text-white"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] py-3 pl-12 pr-4 text-[var(--body-text)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                   required
                 />
               </div>
@@ -213,14 +232,14 @@ const Login = () => {
             <div>
               <label className="block text-sm font-semibold mb-2">Password</label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[var(--text-muted)]" size={20} />
                 <input
                   type="password"
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
                   placeholder="Enter your password"
-                  className="w-full pl-12 pr-4 py-3 glass-card rounded-lg text-white"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] py-3 pl-12 pr-4 text-[var(--body-text)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                   required
                 />
               </div>
@@ -239,7 +258,7 @@ const Login = () => {
                 >
                   {rememberMe && <Check size={14} className="text-white" />}
                 </div>
-                <span className="text-sm text-gray-300 group-hover:text-white transition-colors">
+                <span className="text-sm text-[var(--text-muted)] group-hover:text-[var(--body-text)] transition-colors">
                   Remember my credentials
                 </span>
               </label>
@@ -267,7 +286,7 @@ const Login = () => {
         </motion.div>
 
         {/* Register Link */}
-        <p className="text-center mt-6 text-gray-400">
+        <p className="text-center mt-6 text-[var(--text-muted)]">
           Don't have an account?{' '}
           <button
             onClick={() => navigate('/register')}
