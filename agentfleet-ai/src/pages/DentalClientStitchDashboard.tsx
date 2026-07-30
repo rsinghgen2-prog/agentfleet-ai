@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowUpRight, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Plus, SmilePlus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { BookingModal, type BookingFormData } from '../components/BookingModal'
 import { DashboardService, type Appointment } from '../services/dashboardService'
 import { useDentalDashboardData } from '../hooks/useDentalDashboardData'
@@ -11,15 +12,33 @@ const formatTime = (time: string) => {
 }
 
 const initials = (appointment: Appointment) => `${appointment.first_name[0]}${appointment.last_name[0]}`
+const isoDate = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+const calendarCells = (month: Date) => {
+  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1)
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
+  return Array.from({ length: firstDay.getDay() + daysInMonth }, (_, index) => {
+    if (index < firstDay.getDay()) return null
+    return new Date(month.getFullYear(), month.getMonth(), index - firstDay.getDay() + 1)
+  })
+}
 
 export default function DentalClientStitchDashboard() {
+  const navigate = useNavigate()
   const { client, data, loading, error, refresh } = useDentalDashboardData()
   const [bookingOpen, setBookingOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date())
   const appointments = data?.todaysAppointments || []
   const selected = appointments.find((item) => item.id === selectedId) || appointments[0]
+  const calendarDays = useMemo(() => calendarCells(calendarMonth), [calendarMonth])
+  const appointmentDates = useMemo(() => new Set((data?.calendarData || []).map((item) => item.appointment_date)), [data?.calendarData])
   const displayName = client?.clientName || 'Dr. Rajeev Pratap Singh'
-  const monthLabel = new Date(data?.currentDate.year || new Date().getFullYear(), (data?.currentDate.month || new Date().getMonth() + 1) - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })
+  const monthLabel = calendarMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' })
 
   const handleBooking = async (booking: BookingFormData) => {
     await DashboardService.createBooking(booking)
@@ -48,7 +67,7 @@ export default function DentalClientStitchDashboard() {
           </section>
         </div>
 
-        <aside className="flex flex-col gap-5 xl:col-span-4"><section className="dental-stitch-card p-5"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-xl font-semibold">Your Schedule</h2><p className="mt-1 text-xs text-[#005db6]">{monthLabel}</p></div><div className="flex gap-1"><button className="rounded-full p-2 hover:bg-[#e2e9f2]"><ChevronLeft size={16} /></button><button className="rounded-full p-2 hover:bg-[#e2e9f2]"><ChevronRight size={16} /></button></div></div><div className="grid grid-cols-5 gap-1 border-b border-[#c2c6d4]/30 pb-3 text-center text-[10px] font-bold text-[#727783]">{['SUN', 'MON', 'TUE', 'WED', 'THU'].map((day, index) => <div key={day} className={`rounded-xl p-2 ${index === 1 ? 'bg-[#005db6] text-white' : ''}`}><span className="block">{day}</span><b className="mt-1 block text-sm">{new Date().getDate() + index}</b></div>)}</div><div className="mt-4 rounded-2xl bg-[#edf4fe] p-4"><div className="flex items-center gap-3"><div className="rounded-xl bg-[#d6e3ff] p-3 text-[#005db6]"><CalendarDays size={20} /></div><div><b className="block text-sm">Monthly doctor's meet</b><span className="text-xs text-[#424752]">Today · {appointments[0] ? formatTime(appointments[0].appointment_time) : '08:00 AM'}</span></div></div></div></section><section className="dental-stitch-card min-h-40 p-5"><div className="flex items-center justify-between"><h2 className="text-xl font-semibold">Dentist Notes</h2><button className="rounded-full bg-[#e8eef8] p-2 text-[#005db6]"><Plus size={16} /></button></div><p className="mt-4 text-sm leading-6 text-[#424752]">Keep clinical notes, follow-ups, and treatment reminders together for the next visit.</p><button className="mt-4 flex items-center gap-2 rounded-xl border border-[#c2c6d4] bg-white px-4 py-2 text-xs font-bold text-[#005db6]"><Plus size={15} /> Add new note</button></section></aside>
+        <aside className="flex flex-col gap-5 xl:col-span-4"><section className="dental-stitch-card p-5 sm:p-7"><div className="mb-5 flex items-center justify-between"><h2 className="text-xl font-semibold">Your Schedules</h2><div className="flex gap-1"><button aria-label="Previous month" onClick={() => setCalendarMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))} className="rounded-full p-2 text-[#424752] hover:bg-[#e2e9f2]"><ChevronLeft size={18} /></button><button aria-label="Next month" onClick={() => setCalendarMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))} className="rounded-full p-2 text-[#424752] hover:bg-[#e2e9f2]"><ChevronRight size={18} /></button></div></div><div className="mb-4 flex items-center justify-between border-b border-dashed border-[#727783]/60 pb-4"><span className="text-base text-[#424752]">{monthLabel}</span></div><div className="grid grid-cols-7 gap-y-2 text-center text-xs"><div className="col-span-7 grid grid-cols-7 pb-2 text-[10px] font-medium text-[#727783]">{['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day) => <span key={day}>{day}</span>)}</div>{calendarDays.map((date, index) => { if (!date) return <span key={`empty-${index}`} className="h-9" />; const dateValue = isoDate(date); const isToday = dateValue === isoDate(new Date()); const hasAppointment = appointmentDates.has(dateValue); return <span key={dateValue} className={`mx-auto flex h-9 w-9 items-center justify-center rounded-xl text-sm ${isToday ? 'bg-[#f1f3f5] font-semibold' : ''} ${hasAppointment ? 'border border-[#c77895] text-[#151c23]' : 'text-[#151c23]'}`}>{date.getDate()}</span> })}</div><div className="mt-7 flex items-center justify-between"><h3 className="text-2xl font-semibold">Upcoming</h3><button onClick={() => navigate('/dental-client/schedule')} className="text-sm font-medium text-[#005db6] underline underline-offset-4">View All</button></div><div className="mt-5 rounded-2xl bg-[#edf4fe] p-4"><div className="flex items-center gap-3"><div className="rounded-full bg-[#6ea8e9] p-3 text-white"><CalendarDays size={22} /></div><div><b className="block text-sm">Monthly doctor&apos;s meet</b><span className="text-xs text-[#424752]">{appointments[0] ? `${new Date(`${appointments[0].appointment_date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}  |  ${formatTime(appointments[0].appointment_time)}` : 'No upcoming appointments'}</span></div></div></div></section><section className="dental-stitch-card min-h-40 p-5"><div className="flex items-center justify-between"><h2 className="text-xl font-semibold">Dentist Notes</h2><button className="rounded-full bg-[#e8eef8] p-2 text-[#005db6]"><Plus size={16} /></button></div><p className="mt-4 text-sm leading-6 text-[#424752]">Keep clinical notes, follow-ups, and treatment reminders together for the next visit.</p><button className="mt-4 flex items-center gap-2 rounded-xl border border-[#c2c6d4] bg-white px-4 py-2 text-xs font-bold text-[#005db6]"><Plus size={15} /> Add new note</button></section></aside>
       </div>
       <BookingModal isOpen={bookingOpen} onClose={() => setBookingOpen(false)} onSubmit={handleBooking} />
     </div>
