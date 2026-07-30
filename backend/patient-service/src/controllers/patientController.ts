@@ -1,248 +1,78 @@
-import { Request, Response } from 'express';
-import { pool } from '../config/database';
+import { z } from 'zod'
+import { pool, withTransaction } from '../config/database.js'
+import type { TenantRequest } from '../types.js'
+import { parsePositiveInt, quoteIdentifier } from '../utils/sql.js'
+
+const patientInput = z.object({
+  firstName: z.string().trim().min(1).max(100), lastName: z.string().trim().min(1).max(100),
+  dateOfBirth: z.string().date().optional().nullable(), gender: z.string().trim().max(30).optional().nullable(),
+  email: z.string().email().optional().nullable(), phone: z.string().trim().max(50).optional().nullable(),
+  addressLine1: z.string().trim().max(255).optional().nullable(), city: z.string().trim().max(100).optional().nullable(),
+  state: z.string().trim().max(100).optional().nullable(), postalCode: z.string().trim().max(20).optional().nullable(),
+  notes: z.string().trim().max(5000).optional().nullable(),
+})
+
+const appointmentInput = z.object({
+  patientId: z.string().uuid(), appointmentDate: z.string().date(),
+  appointmentTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/),
+  duration: z.number().int().min(5).max(480).default(30), appointmentType: z.string().trim().min(1).max(100),
+  status: z.enum(['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show']).default('scheduled'),
+  reason: z.string().trim().max(2000).optional().nullable(), notes: z.string().trim().max(5000).optional().nullable(),
+  followUpRequired: z.boolean().default(false), followUpDate: z.string().date().optional().nullable(),
+})
+
+const bookingInput = appointmentInput.omit({ patientId: true }).extend({
+  firstName: z.string().trim().min(1).max(100), lastName: z.string().trim().min(1).max(100),
+  phone: z.string().trim().min(1).max(50), email: z.string().email(),
+  dateOfBirth: z.string().date().optional().nullable(), gender: z.string().max(30).optional().nullable(),
+})
+
+function schema(req: TenantRequest) { if (!req.tenant) throw new Error('Tenant context is missing'); return quoteIdentifier(req.tenant.schemaName) }
+function actor(req: TenantRequest) { return req.user?.userId || null }
+function param(req: TenantRequest, name: string) { return String(req.params[name]) }
+function sendError(res: any, error: unknown, message: string) { if (error instanceof z.ZodError) return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues }); const status = (error as { status?: number }).status || 500; if (status === 500) console.error(error); return res.status(status).json({ success: false, message: status === 409 ? (error as Error).message : message }) }
+async function audit(s: string, req: TenantRequest, action: string, entity: string, id: string, values: unknown) { await pool.query(`INSERT INTO ${s}.audit_logs (user_id, action, entity_type, entity_id, new_values) VALUES ($1,$2,$3,$4,$5)`, [actor(req), action, entity, id, values]) }
 
 export class PatientController {
-  /**
-   * Get complete dashboard data
-   * GET /api/v1/patients/dashboard
-   */
-  static async getDashboardData(req: Request, res: Response) {
+  static async getDashboardData(req: TenantRequest, res: any) {
     try {
-      const tenantSchema = (req as any).tenantSchema;
-      
-      // Get today's date
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Get today's appointments with patient details
-      const todaysAppointments = await pool.query(`
-        SELECT 
-          a.id,
-          a.appointment_date,
-          a.appointment_time,
-          a.duration,
-          a.appointment_type,
-          a.status,
-          a.reason,
-          a.notes,
-          p.id as patient_id,
-          p.first_name,
-          p.last_name,
-          p.phone,
-          p.email,
-          p.gender
-        FROM ${tenantSchema}.appointments a
-        JOIN ${tenantSchema}.patients p ON a.patient_id = p.id
-        WHERE a.appointment_date = $1
-        ORDER BY a.appointment_time
-      `, [today]);
-      
-      // Get calendar appointments for current month
-      const currentMonth = new Date().getMonth() + 1;
-      const currentYear = new Date().getFullYear();
-      const firstDay = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
-      const lastDay = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
-      
-      const calendarAppointments = await pool.query(`
-        SELECT 
-          appointment_date,
-          COUNT(*) as count
-        FROM ${tenantSchema}.appointments
-        WHERE appointment_date BETWEEN $1 AND $2
-        GROUP BY appointment_date
-        ORDER BY appointment_date
-      `, [firstDay, lastDay]);
-      
-      // Get visit statistics
-      const visitsStats = await pool.query(`
-        SELECT 
-          COUNT(DISTINCT CASE WHEN a.appointment_date = $1 THEN a.patient_id END) as today_visits,
-          COUNT(DISTINCT CASE WHEN p.created_at >= $1 THEN p.id END) as new_patients_today,
-          COUNT(DISTINCT CASE WHEN a.appointment_date = $1 AND a.status != 'cancelled' THEN a.id END) as total_appointments_today
-        FROM ${tenantSchema}.patients p
-        LEFT JOIN ${tenantSchema}.appointments a ON p.id = a.patient_id
-      `, [today]);
-      
-      // Get total patients
-      const totalPatients = await pool.query(`
-        SELECT COUNT(*) as count FROM ${tenantSchema}.patients
-      `);
-      
-      res.json({
-        success: true,
-        data: {
-          todaysAppointments: todaysAppointments.rows,
-          calendarData: calendarAppointments.rows,
-          stats: {
-            todayVisits: parseInt(visitsStats.rows[0].today_visits) || 0,
-            newPatientsToday: parseInt(visitsStats.rows[0].new_patients_today) || 0,
-            totalAppointmentsToday: parseInt(visitsStats.rows[0].total_appointments_today) || 0,
-            totalPatients: parseInt(totalPatients.rows[0].count) || 0
-          },
-          currentDate: {
-            month: currentMonth,
-            year: currentYear,
-            today: today
-          }
-        }
-      });
-    } catch (error: any) {
-      console.error('Error fetching dashboard data:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch dashboard data',
-        error: error.message
-      });
-    }
+      const s = schema(req)
+      const [appointments, calendar, stats, followUps] = await Promise.all([
+        pool.query(`SELECT a.*, p.first_name, p.last_name, p.phone, p.email, p.gender, p.date_of_birth FROM ${s}.appointments a JOIN ${s}.patients p ON p.id = a.patient_id WHERE a.appointment_date = CURRENT_DATE AND a.status <> 'cancelled' ORDER BY a.appointment_time`),
+        pool.query(`SELECT appointment_date, COUNT(*)::int AS count FROM ${s}.appointments WHERE appointment_date >= DATE_TRUNC('month', CURRENT_DATE)::date AND appointment_date < (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month')::date AND status <> 'cancelled' GROUP BY appointment_date ORDER BY appointment_date`),
+        pool.query(`SELECT (SELECT COUNT(DISTINCT patient_id) FROM ${s}.appointments WHERE appointment_date = CURRENT_DATE AND status <> 'cancelled')::int AS today_visits, (SELECT COUNT(*) FROM ${s}.patients WHERE created_at::date = CURRENT_DATE AND is_active)::int AS new_patients_today, (SELECT COUNT(*) FROM ${s}.appointments WHERE appointment_date = CURRENT_DATE AND status <> 'cancelled')::int AS total_appointments_today, (SELECT COUNT(*) FROM ${s}.patients WHERE is_active)::int AS total_patients`),
+        pool.query(`SELECT a.id, a.appointment_date, a.appointment_time, a.reason, a.follow_up_date, p.first_name, p.last_name FROM ${s}.appointments a JOIN ${s}.patients p ON p.id = a.patient_id WHERE a.follow_up_required AND a.follow_up_date >= CURRENT_DATE ORDER BY a.follow_up_date, a.appointment_time LIMIT 10`),
+      ])
+      return res.json({ success: true, data: { todaysAppointments: appointments.rows, calendarData: calendar.rows, upcomingFollowUps: followUps.rows, stats: stats.rows[0], currentDate: { month: new Date().getMonth() + 1, year: new Date().getFullYear(), today: new Date().toISOString().slice(0, 10) } } })
+    } catch (error) { return sendError(res, error, 'Failed to fetch dashboard data') }
   }
 
-  /**
-   * Get all patients
-   * GET /api/v1/patients/patients
-   */
-  static async getPatients(req: Request, res: Response) {
+  static async getPatients(req: TenantRequest, res: any) {
     try {
-      const tenantSchema = (req as any).tenantSchema;
-      const { limit = 50, offset = 0, search } = req.query;
-      
-      let query = `
-        SELECT 
-          id, first_name, last_name, date_of_birth, gender, 
-          phone, email, address_line1, city, state,
-          dental_history, last_cleaning_date, created_at
-        FROM ${tenantSchema}.patients
-      `;
-      
-      const params: any[] = [];
-      
-      if (search) {
-        query += ` WHERE first_name ILIKE $1 OR last_name ILIKE $1 OR phone ILIKE $1 OR email ILIKE $1`;
-        params.push(`%${search}%`);
-      }
-      
-      query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-      params.push(limit, offset);
-      
-      const result = await pool.query(query, params);
-      
-      res.json({
-        success: true,
-        data: result.rows,
-        meta: {
-          total: result.rowCount,
-          limit: parseInt(limit as string),
-          offset: parseInt(offset as string)
-        }
-      });
-    } catch (error: any) {
-      console.error('Error fetching patients:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch patients',
-        error: error.message
-      });
-    }
+      const s = schema(req); const limit = parsePositiveInt(req.query.limit, 25, 100); const offset = parsePositiveInt(req.query.offset, 0, 100000); const search = typeof req.query.search === 'string' ? req.query.search.trim() : ''; const values: unknown[] = []; const where = search ? `AND (p.first_name ILIKE $1 OR p.last_name ILIKE $1 OR p.phone ILIKE $1 OR p.email ILIKE $1)` : ''; if (search) values.push(`%${search}%`); values.push(limit, offset)
+      const [rows, count] = await Promise.all([pool.query(`SELECT p.*, (SELECT MAX(a.appointment_date) FROM ${s}.appointments a WHERE a.patient_id = p.id AND a.status = 'completed') AS last_visit, (SELECT MIN(a.appointment_date) FROM ${s}.appointments a WHERE a.patient_id = p.id AND a.appointment_date >= CURRENT_DATE AND a.status NOT IN ('cancelled', 'completed')) AS next_appointment FROM ${s}.patients p WHERE p.is_active ${where} ORDER BY p.created_at DESC LIMIT $${values.length - 1} OFFSET $${values.length}`, values), pool.query(`SELECT COUNT(*)::int AS total FROM ${s}.patients p WHERE p.is_active ${where}`, search ? [values[0]] : [])])
+      return res.json({ success: true, data: rows.rows, meta: { total: count.rows[0].total, limit, offset } })
+    } catch (error) { return sendError(res, error, 'Failed to fetch patients') }
   }
 
-  /**
-   * Get today's appointments
-   * GET /api/v1/patients/appointments/today
-   */
-  static async getTodaysAppointments(req: Request, res: Response) {
-    try {
-      const tenantSchema = (req as any).tenantSchema;
-      const today = new Date().toISOString().split('T')[0];
-      
-      const result = await pool.query(`
-        SELECT 
-          a.*,
-          p.first_name,
-          p.last_name,
-          p.phone,
-          p.email,
-          p.gender,
-          p.date_of_birth
-        FROM ${tenantSchema}.appointments a
-        JOIN ${tenantSchema}.patients p ON a.patient_id = p.id
-        WHERE a.appointment_date = $1
-        ORDER BY a.appointment_time
-      `, [today]);
-      
-      res.json({
-        success: true,
-        data: result.rows
-      });
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch today\'s appointments',
-        error: error.message
-      });
-    }
-  }
+  static async getPatientById(req: TenantRequest, res: any) { try { const id = param(req, 'id'); const s = schema(req); const result = await pool.query(`SELECT * FROM ${s}.patients WHERE id = $1 AND is_active`, [id]); if (!result.rowCount) return res.status(404).json({ success: false, message: 'Patient not found' }); const appointments = await pool.query(`SELECT * FROM ${s}.appointments WHERE patient_id = $1 ORDER BY appointment_date DESC, appointment_time DESC`, [id]); return res.json({ success: true, data: { ...result.rows[0], appointments: appointments.rows } }) } catch (error) { return sendError(res, error, 'Failed to fetch patient') } }
 
-  /**
-   * Create new patient and appointment booking
-   * POST /api/v1/patients/bookings
-   */
-  static async createBooking(req: Request, res: Response) {
-    try {
-      const tenantSchema = (req as any).tenantSchema;
-      const {
-        firstName, lastName, phone, email, dateOfBirth, gender,
-        appointmentDate, appointmentTime, appointmentType, reason, notes
-      } = req.body;
+  static async createPatient(req: TenantRequest, res: any) { try { const input = patientInput.parse(req.body); const s = schema(req); const result = await pool.query(`INSERT INTO ${s}.patients (first_name,last_name,date_of_birth,gender,email,phone,address_line1,city,state,postal_code,notes,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`, [input.firstName, input.lastName, input.dateOfBirth || null, input.gender || null, input.email || null, input.phone || null, input.addressLine1 || null, input.city || null, input.state || null, input.postalCode || null, input.notes || null, actor(req)]); await audit(s, req, 'create', 'patient', result.rows[0].id, result.rows[0]); return res.status(201).json({ success: true, data: result.rows[0] }) } catch (error) { return sendError(res, error, 'Failed to create patient') } }
 
-      // 1. Create patient first
-      const patientResult = await pool.query(`
-        INSERT INTO ${tenantSchema}.patients
-        (first_name, last_name, phone, email, date_of_birth, gender, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-        RETURNING id
-      `, [firstName, lastName, phone, email, dateOfBirth || null, gender]);
+  static async updatePatient(req: TenantRequest, res: any) { try { const input = patientInput.partial().parse(req.body); const id = param(req, 'id'); const s = schema(req); const names: Record<string, string> = { firstName: 'first_name', lastName: 'last_name', dateOfBirth: 'date_of_birth', addressLine1: 'address_line1', postalCode: 'postal_code' }; const fields = Object.entries(input); if (!fields.length) return res.status(400).json({ success: false, message: 'No fields to update' }); const assignments = fields.map(([key], index) => `${names[key] || key} = $${index + 1}`); const result = await pool.query(`UPDATE ${s}.patients SET ${assignments.join(', ')}, updated_at = NOW() WHERE id = $${fields.length + 1} AND is_active RETURNING *`, [...fields.map(([, value]) => value), id]); if (!result.rowCount) return res.status(404).json({ success: false, message: 'Patient not found' }); await audit(s, req, 'update', 'patient', id, result.rows[0]); return res.json({ success: true, data: result.rows[0] }) } catch (error) { return sendError(res, error, 'Failed to update patient') } }
 
-      const patientId = patientResult.rows[0].id;
+  static async deletePatient(req: TenantRequest, res: any) { try { const id = param(req, 'id'); const s = schema(req); const result = await pool.query(`UPDATE ${s}.patients SET is_active = FALSE, updated_at = NOW() WHERE id = $1 AND is_active RETURNING id`, [id]); if (!result.rowCount) return res.status(404).json({ success: false, message: 'Patient not found' }); await audit(s, req, 'archive', 'patient', id, result.rows[0]); return res.json({ success: true, data: result.rows[0] }) } catch (error) { return sendError(res, error, 'Failed to archive patient') } }
 
-      // 2. Create appointment
-      const appointmentResult = await pool.query(`
-        INSERT INTO ${tenantSchema}.appointments
-        (patient_id, appointment_date, appointment_time, duration, appointment_type, status, reason, notes, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-        RETURNING id
-      `, [patientId, appointmentDate, appointmentTime, 30, appointmentType, 'scheduled', reason, notes || '']);
+  static async getAppointments(req: TenantRequest, res: any) { try { const s = schema(req); const from = typeof req.query.from === 'string' ? req.query.from : new Date().toISOString().slice(0, 10); const to = typeof req.query.to === 'string' ? req.query.to : from; const values: unknown[] = [from, to]; const status = typeof req.query.status === 'string' ? req.query.status : ''; const statusClause = status ? 'AND a.status = $3' : ''; if (status) values.push(status); const result = await pool.query(`SELECT a.*, p.first_name, p.last_name, p.phone, p.email FROM ${s}.appointments a JOIN ${s}.patients p ON p.id = a.patient_id WHERE a.appointment_date BETWEEN $1 AND $2 ${statusClause} ORDER BY a.appointment_date, a.appointment_time`, values); return res.json({ success: true, data: result.rows }) } catch (error) { return sendError(res, error, 'Failed to fetch appointments') } }
+  static async getTodaysAppointments(req: TenantRequest, res: any) { req.query.from = new Date().toISOString().slice(0, 10); req.query.to = req.query.from; return PatientController.getAppointments(req, res) }
+  static async getCalendarAppointments(req: TenantRequest, res: any) { return PatientController.getAppointments(req, res) }
+  static async getAppointmentById(req: TenantRequest, res: any) { try { const id = param(req, 'id'); const s = schema(req); const result = await pool.query(`SELECT a.*, p.first_name, p.last_name, p.phone, p.email FROM ${s}.appointments a JOIN ${s}.patients p ON p.id = a.patient_id WHERE a.id = $1`, [id]); if (!result.rowCount) return res.status(404).json({ success: false, message: 'Appointment not found' }); return res.json({ success: true, data: result.rows[0] }) } catch (error) { return sendError(res, error, 'Failed to fetch appointment') } }
 
-      const appointmentId = appointmentResult.rows[0].id;
+  static async createAppointment(req: TenantRequest, res: any) { try { const input = appointmentInput.parse(req.body); const s = schema(req); const conflict = await pool.query(`SELECT id FROM ${s}.appointments WHERE appointment_date = $1 AND appointment_time = $2 AND status NOT IN ('cancelled','completed') LIMIT 1`, [input.appointmentDate, input.appointmentTime]); if (conflict.rowCount) return res.status(409).json({ success: false, message: 'Appointment slot is already booked' }); const result = await pool.query(`INSERT INTO ${s}.appointments (patient_id,appointment_date,appointment_time,duration,appointment_type,status,reason,notes,follow_up_required,follow_up_date,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`, [input.patientId, input.appointmentDate, input.appointmentTime, input.duration, input.appointmentType, input.status, input.reason || null, input.notes || null, input.followUpRequired, input.followUpDate || null, actor(req)]); return res.status(201).json({ success: true, data: result.rows[0] }) } catch (error) { return sendError(res, error, 'Failed to create appointment') } }
+  static async updateAppointment(req: TenantRequest, res: any) { try { const input = appointmentInput.partial().parse(req.body); const s = schema(req); const names: Record<string, string> = { patientId: 'patient_id', appointmentDate: 'appointment_date', appointmentTime: 'appointment_time', appointmentType: 'appointment_type', followUpRequired: 'follow_up_required', followUpDate: 'follow_up_date' }; const fields = Object.entries(input); if (!fields.length) return res.status(400).json({ success: false, message: 'No fields to update' }); const assignments = fields.map(([key], index) => `${names[key] || key} = $${index + 1}`); const result = await pool.query(`UPDATE ${s}.appointments SET ${assignments.join(', ')}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`, [...fields.map(([, value]) => value), req.params.id]); if (!result.rowCount) return res.status(404).json({ success: false, message: 'Appointment not found' }); return res.json({ success: true, data: result.rows[0] }) } catch (error) { return sendError(res, error, 'Failed to update appointment') } }
+  static async deleteAppointment(req: TenantRequest, res: any) { try { const result = await pool.query(`UPDATE ${schema(req)}.appointments SET status = 'cancelled', updated_at = NOW() WHERE id = $1 AND status <> 'cancelled' RETURNING id`, [req.params.id]); if (!result.rowCount) return res.status(404).json({ success: false, message: 'Appointment not found' }); return res.json({ success: true, data: result.rows[0] }) } catch (error) { return sendError(res, error, 'Failed to cancel appointment') } }
+  static async getStatsSummary(req: TenantRequest, res: any) { try { const s = schema(req); const result = await pool.query(`SELECT (SELECT COUNT(*)::int FROM ${s}.patients WHERE is_active) AS total_patients, (SELECT COUNT(*)::int FROM ${s}.appointments WHERE appointment_date = CURRENT_DATE AND status <> 'cancelled') AS appointments_today, (SELECT COUNT(*)::int FROM ${s}.appointments WHERE status = 'completed' AND appointment_date >= DATE_TRUNC('month', CURRENT_DATE)) AS completed_this_month`); return res.json({ success: true, data: result.rows[0] }) } catch (error) { return sendError(res, error, 'Failed to fetch statistics') } }
+  static async getVisitsStats(req: TenantRequest, res: any) { try { const result = await pool.query(`SELECT appointment_date, COUNT(*)::int AS visits FROM ${schema(req)}.appointments WHERE appointment_date >= CURRENT_DATE - INTERVAL '30 days' AND status <> 'cancelled' GROUP BY appointment_date ORDER BY appointment_date`); return res.json({ success: true, data: result.rows }) } catch (error) { return sendError(res, error, 'Failed to fetch visit statistics') } }
 
-      res.json({
-        success: true,
-        message: 'Booking created successfully',
-        data: {
-          patientId,
-          appointmentId,
-          appointmentDate,
-          appointmentTime
-        }
-      });
-    } catch (error: any) {
-      console.error('Error creating booking:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to create booking',
-        error: error.message
-      });
-    }
-  }
-
-  // Placeholder methods (to be implemented)
-  static async getPatientById(req: Request, res: Response) { res.json({ success: true }); }
-  static async createPatient(req: Request, res: Response) { res.json({ success: true }); }
-  static async updatePatient(req: Request, res: Response) { res.json({ success: true }); }
-  static async deletePatient(req: Request, res: Response) { res.json({ success: true }); }
-  static async getAppointments(req: Request, res: Response) { res.json({ success: true }); }
-  static async getCalendarAppointments(req: Request, res: Response) { res.json({ success: true }); }
-  static async getAppointmentById(req: Request, res: Response) { res.json({ success: true }); }
-  static async createAppointment(req: Request, res: Response) { res.json({ success: true }); }
-  static async updateAppointment(req: Request, res: Response) { res.json({ success: true }); }
-  static async deleteAppointment(req: Request, res: Response) { res.json({ success: true }); }
-  static async getStatsSummary(req: Request, res: Response) { res.json({ success: true }); }
-  static async getVisitsStats(req: Request, res: Response) { res.json({ success: true }); }
+  static async createBooking(req: TenantRequest, res: any) { try { const input = bookingInput.parse(req.body); const s = schema(req); const result = await withTransaction(async (client) => { const existing = await client.query(`SELECT id FROM ${s}.patients WHERE is_active AND (email = $1 OR phone = $2) ORDER BY created_at DESC LIMIT 1`, [input.email, input.phone]); const patient = existing.rows[0] || (await client.query(`INSERT INTO ${s}.patients (first_name,last_name,email,phone,date_of_birth,gender,notes,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`, [input.firstName, input.lastName, input.email, input.phone, input.dateOfBirth || null, input.gender || null, input.notes || null, actor(req)])).rows[0]; const conflict = await client.query(`SELECT id FROM ${s}.appointments WHERE appointment_date = $1 AND appointment_time = $2 AND status NOT IN ('cancelled','completed') LIMIT 1`, [input.appointmentDate, input.appointmentTime]); if (conflict.rowCount) { const error = new Error('Appointment slot is already booked') as Error & { status?: number }; error.status = 409; throw error } const appointment = await client.query(`INSERT INTO ${s}.appointments (patient_id,appointment_date,appointment_time,duration,appointment_type,status,reason,notes,follow_up_required,follow_up_date,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`, [patient.id, input.appointmentDate, input.appointmentTime, input.duration, input.appointmentType, input.status, input.reason || null, input.notes || null, input.followUpRequired, input.followUpDate || null, actor(req)]); return { patientId: patient.id, appointmentId: appointment.rows[0].id, appointmentDate: input.appointmentDate, appointmentTime: input.appointmentTime } }); return res.status(201).json({ success: true, data: result }) } catch (error) { return sendError(res, error, 'Failed to create booking') } }
 }

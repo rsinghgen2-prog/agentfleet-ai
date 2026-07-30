@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Mail, Lock, ArrowLeft, Sparkles, AlertCircle, Check } from 'lucide-react'
 import { SUPER_ADMIN, validateSuperAdmin } from '../config/superAdmin'
-import { validateClient } from '../config/clients'
+import { getClientByEmail, validateClient } from '../config/clients'
 
 const Login = () => {
   const navigate = useNavigate()
@@ -17,12 +17,12 @@ const Login = () => {
   // Load saved credentials on component mount
   useEffect(() => {
     const savedEmail = localStorage.getItem('savedEmail')
-    const savedPassword = localStorage.getItem('savedPassword')
+    localStorage.removeItem('savedPassword')
 
-    if (savedEmail && savedPassword) {
+    if (savedEmail) {
       setFormData({
         email: savedEmail,
-        password: savedPassword
+        password: ''
       })
       setRememberMe(true)
     }
@@ -36,16 +36,14 @@ const Login = () => {
     setError('')
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // Save or clear credentials based on Remember Me checkbox
     if (rememberMe) {
       localStorage.setItem('savedEmail', formData.email)
-      localStorage.setItem('savedPassword', formData.password)
     } else {
       localStorage.removeItem('savedEmail')
-      localStorage.removeItem('savedPassword')
     }
 
     // 1. Check if Super Admin
@@ -60,8 +58,33 @@ const Login = () => {
     }
 
     // 2. Check if Client (Multi-tenant)
-    const client = validateClient(formData.email, formData.password)
+    const client = getClientByEmail(formData.email)
     if (client) {
+      let authenticated = false
+      try {
+        const authResponse = await fetch(`${import.meta.env.VITE_AUTH_API_URL || 'http://localhost:3001'}/api/v1/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email, password: formData.password, tenantSlug: client.tenantSlug }),
+        })
+        const authBody = await authResponse.json().catch(() => ({}))
+        if (authResponse.ok && authBody.data?.tokens?.accessToken) {
+          localStorage.setItem('accessToken', authBody.data.tokens.accessToken)
+          if (authBody.data.tokens.refreshToken) localStorage.setItem('refreshToken', authBody.data.tokens.refreshToken)
+          authenticated = true
+        } else if (!import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE !== 'true') {
+          throw new Error(authBody.message || 'Authentication service rejected the login')
+        }
+      } catch (authError) {
+        if (!import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE !== 'true') {
+          setError(authError instanceof Error ? authError.message : 'Unable to reach authentication service')
+          return
+        }
+      }
+      if (!authenticated && !validateClient(formData.email, formData.password)) {
+        setError('Invalid email or password')
+        return
+      }
       localStorage.setItem('isLoggedIn', 'true')
       localStorage.setItem('userType', 'client')
       localStorage.setItem('clientData', JSON.stringify(client))

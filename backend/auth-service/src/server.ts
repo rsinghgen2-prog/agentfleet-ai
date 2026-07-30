@@ -8,6 +8,10 @@ import authRoutes from './routes/authRoutes';
 
 dotenv.config();
 
+if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
+  throw new Error('JWT_SECRET and JWT_REFRESH_SECRET are required')
+}
+
 const app: Application = express();
 const PORT = process.env.PORT || 3001;
 

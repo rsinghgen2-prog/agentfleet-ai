@@ -1,5 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import type { CSSProperties } from 'react'
 import { Bell, CalendarDays, CircleHelp, Grid2X2, LogOut, Menu, Package, Search, Settings, Users } from 'lucide-react'
+import { useDentalDashboardData } from '../../hooks/useDentalDashboardData'
 
 const navItems = [
   { label: 'Dashboard', to: '/dental-client', icon: Grid2X2, end: true },
@@ -11,14 +13,18 @@ const navItems = [
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-bold tracking-wide transition-colors ${
-    isActive ? 'bg-[#005db6] text-white shadow-md' : 'text-[#424752] hover:bg-[#e2e9f2]'
+    isActive ? 'bg-[var(--tenant-primary)] text-white shadow-md' : 'text-[#424752] hover:bg-[#e2e9f2]'
   }`
 
 export default function DentalClientShell() {
   const navigate = useNavigate()
+  const { client, settings } = useDentalDashboardData()
   const clientName = (() => {
     try { return JSON.parse(localStorage.getItem('clientData') || '{}').clientName || 'Dr. Rajeev Pratap Singh' } catch { return 'Dr. Rajeev Pratap Singh' }
   })()
+  const clinicName = settings?.clinic_name || client?.brandName || 'Dental Clinic'
+  const logo = settings?.branding?.logo || client?.logo || '🦷'
+  const primaryColor = settings?.branding?.primaryColor || client?.primaryColor || '#005db6'
   const initials = clientName.split(' ').map((part: string) => part[0]).join('').slice(0, 2)
 
   const logout = () => {
@@ -32,13 +38,13 @@ export default function DentalClientShell() {
   }
 
   return (
-    <div className="dental-stitch-app flex min-h-screen">
+    <div className="dental-stitch-app flex min-h-screen" style={{ '--tenant-primary': primaryColor } as CSSProperties}>
       <aside className="fixed inset-y-0 left-0 z-50 hidden w-20 flex-col bg-[#edf4fe] px-3 py-7 shadow-sm md:flex lg:w-64 lg:px-5">
         <div className="mb-9 flex items-center gap-3 px-2">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#005db6] text-xl text-white">🦷</div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#005db6] text-xl text-white">{logo}</div>
           <div className="hidden lg:block">
-            <p className="text-lg font-bold leading-tight text-[#005db6]">V.P.S.</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#424752]">Dental &amp; Oral Care</p>
+            <p className="text-lg font-bold leading-tight text-[#005db6]">{clinicName}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#424752]">Dental workspace</p>
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-2">
@@ -58,7 +64,7 @@ export default function DentalClientShell() {
               <input aria-label="Search patients or appointments" className="h-11 w-full rounded-2xl border-0 bg-white px-5 pr-12 text-sm shadow-sm outline-none focus:ring-2 focus:ring-[#005db6]/20" placeholder="Find Patients or Appointments" />
               <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-[#727783]" size={18} />
             </div>
-            <span className="truncate text-lg font-bold text-[#005db6] sm:hidden">V.P.S. Dental</span>
+            <span className="truncate text-lg font-bold text-[#005db6] sm:hidden">{clinicName}</span>
           </div>
           <div className="flex items-center gap-3">
             <button aria-label="Notifications" className="relative rounded-full bg-white p-2.5 text-[#424752] shadow-sm hover:bg-[#e2e9f2]"><Bell size={18} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#a23858]" /></button>

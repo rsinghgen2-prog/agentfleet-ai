@@ -1,69 +1,39 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: agentfleet-postgres
     environment:
       POSTGRES_DB: agentfleet
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      SEED_PASSWORD: ${SEED_PASSWORD:?Set SEED_PASSWORD in .env}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./database/tenant-schema.sql:/docker-entrypoint-initdb.d/02-tenant-schema.sql
-    networks:
-      - agentfleet-network
+      - ./database/bootstrap.sql:/docker-entrypoint-initdb.d/00-bootstrap.sql:ro
+      - ./database/schema.sql:/opt/agentfleet-database/01-platform-schema.sql:ro
+      - ./database/tenant-template.sql:/opt/agentfleet-database/02-tenant-template.sql:ro
+      - ./database/seed-data-v2.sql:/opt/agentfleet-database/03-seed-data.sql:ro
+    networks: [agentfleet-network]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agentfleet"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Redis (for caching & queues)
   redis:
     image: redis:7-alpine
     container_name: agentfleet-redis
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - agentfleet-network
+    networks: [agentfleet-network]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # API Gateway
-  api-gateway:
-    build:
-      context: ./api-gateway
-      dockerfile: Dockerfile
-    container_name: agentfleet-api-gateway
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=development
-      - PORT=3000
-      - AUTH_SERVICE_URL=http://auth-service:3001
-      - USER_SERVICE_URL=http://user-service:3002
-      - TENANT_SERVICE_URL=http://tenant-service:3003
-      - AUTOMATION_SERVICE_URL=http://automation-service:3004
-      - PAYMENT_SERVICE_URL=http://payment-service:3005
-      - ANALYTICS_SERVICE_URL=http://analytics-service:3006
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - redis
-    networks:
-      - agentfleet-network
-    restart: unless-stopped
-
-  # Auth Service
   auth-service:
     build:
       context: ./auth-service
@@ -72,128 +42,35 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - NODE_ENV=development
-      - PORT=3001
-      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/agentfleet
-      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
-      - JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-in-production
-      - REDIS_URL=redis://redis:6379
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/agentfleet
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - agentfleet-network
+    networks: [agentfleet-network]
     restart: unless-stopped
 
-  # User Service
-  user-service:
+  patient-service:
     build:
-      context: ./user-service
+      context: ./patient-service
       dockerfile: Dockerfile
-    container_name: agentfleet-user-service
+    container_name: agentfleet-patient-service
     ports:
-      - "3002:3002"
+      - "3010:3010"
     environment:
-      - NODE_ENV=development
-      - PORT=3002
-      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/agentfleet
-      - REDIS_URL=redis://redis:6379
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3010
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/agentfleet
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - agentfleet-network
-    restart: unless-stopped
-
-  # Tenant Service
-  tenant-service:
-    build:
-      context: ./tenant-service
-      dockerfile: Dockerfile
-    container_name: agentfleet-tenant-service
-    ports:
-      - "3003:3003"
-    environment:
-      - NODE_ENV=development
-      - PORT=3003
-      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/agentfleet
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - agentfleet-network
-    restart: unless-stopped
-
-  # Automation Service
-  automation-service:
-    build:
-      context: ./automation-service
-      dockerfile: Dockerfile
-    container_name: agentfleet-automation-service
-    ports:
-      - "3004:3004"
-    environment:
-      - NODE_ENV=development
-      - PORT=3004
-      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/agentfleet
-      - REDIS_URL=redis://redis:6379
-      - TWILIO_ACCOUNT_SID=your_twilio_sid
-      - TWILIO_AUTH_TOKEN=your_twilio_token
-      - TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - agentfleet-network
-    restart: unless-stopped
-
-  # Payment Service
-  payment-service:
-    build:
-      context: ./payment-service
-      dockerfile: Dockerfile
-    container_name: agentfleet-payment-service
-    ports:
-      - "3005:3005"
-    environment:
-      - NODE_ENV=development
-      - PORT=3005
-      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/agentfleet
-      - STRIPE_SECRET_KEY=your_stripe_secret
-      - RAZORPAY_KEY_ID=your_razorpay_key
-      - RAZORPAY_KEY_SECRET=your_razorpay_secret
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - agentfleet-network
-    restart: unless-stopped
-
-  # Analytics Service
-  analytics-service:
-    build:
-      context: ./analytics-service
-      dockerfile: Dockerfile
-    container_name: agentfleet-analytics-service
-    ports:
-      - "3006:3006"
-    environment:
-      - NODE_ENV=development
-      - PORT=3006
-      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/agentfleet
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - agentfleet-network
+    networks: [agentfleet-network]
     restart: unless-stopped
 
 networks:
@@ -202,4 +79,3 @@ networks:
 
 volumes:
   postgres_data:
-  redis_data:

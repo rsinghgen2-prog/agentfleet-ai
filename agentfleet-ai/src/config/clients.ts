@@ -5,6 +5,7 @@ export interface Client {
   clientName: string
   domain: string
   subdomain: string
+  tenantSlug?: string
   brandName: string
   dashboardType: 'dental' | 'hospital' | 'school' | 'retail'
   primaryColor: string
@@ -19,6 +20,7 @@ export const CLIENTS: Client[] = [
     clientName: 'Dr. Rajeev Pratap Singh',
     domain: 'Hospital',
     subdomain: 'Dental',
+    tenantSlug: 'vps-dental',
     brandName: 'V.P.S. Dental & Oral Care',
     dashboardType: 'dental',
     primaryColor: '#0EA5E9', // Sky blue

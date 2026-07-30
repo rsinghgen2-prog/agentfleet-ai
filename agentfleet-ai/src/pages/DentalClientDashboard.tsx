@@ -59,7 +59,7 @@ const DentalClientDashboard = () => {
   const handleBookingSubmit = async (bookingData: BookingFormData) => {
     try {
       const result = await DashboardService.createBooking(bookingData)
-      if (result.success) {
+      if (result) {
         await loadDashboardData()
         setIsBookingModalOpen(false)
       }
@@ -177,9 +177,9 @@ const DentalClientDashboard = () => {
         time: dashboardData.todaysAppointments[0].appointment_time.substring(0, 5)
       }
     : {
-        title: "Monthly doctor's meet",
-        date: '12 October, 2025',
-        time: '08:00 PM'
+        title: 'No upcoming appointments',
+        date: '—',
+        time: '—'
       }
 
   return (

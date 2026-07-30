@@ -1,192 +1,55 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3010'
+const DEMO_MODE = import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === 'true'
 
-export interface Patient {
-  id: string
-  first_name: string
-  last_name: string
-  phone: string
-  email: string
-  gender: string
-  date_of_birth: string
-}
+export interface Patient { id: string; first_name: string; last_name: string; phone?: string; email?: string; gender?: string; date_of_birth?: string; last_visit?: string | null; next_appointment?: string | null }
+export interface Appointment { id: string; patient_id: string; appointment_date: string; appointment_time: string; duration: number; appointment_type: string; status: string; reason: string; notes: string; first_name: string; last_name: string; phone: string; gender: string }
+export interface InventoryItem { id: string; name: string; category: string; quantity: number; reorder_level: number; unit: string; low_stock?: boolean }
+export interface ClinicSettings { clinic_name: string; clinic_email?: string; phone?: string; address: Record<string, unknown>; branding: Record<string, string>; working_hours: Record<string, string>; appointment_settings: Record<string, unknown>; notifications: Record<string, boolean>; timezone: string }
+export interface DashboardData { todaysAppointments: Appointment[]; calendarData: Array<{ appointment_date: string; count: number }>; upcomingFollowUps?: Patient[]; stats: { todayVisits: number; newPatientsToday: number; totalAppointmentsToday: number; totalPatients: number }; currentDate: { month: number; year: number; today: string } }
 
-export interface Appointment {
-  id: string
-  patient_id: string
-  appointment_date: string
-  appointment_time: string
-  duration: number
-  appointment_type: string
-  status: string
-  reason: string
-  notes: string
-  first_name: string
-  last_name: string
-  phone: string
-  gender: string
-}
-
-export interface DashboardData {
-  todaysAppointments: Appointment[]
-  calendarData: Array<{
-    appointment_date: string
-    count: number
-  }>
-  stats: {
-    todayVisits: number
-    newPatientsToday: number
-    totalAppointmentsToday: number
-    totalPatients: number
-  }
-  currentDate: {
-    month: number
-    year: number
-    today: string
-  }
-}
-
-// Mock data for development/testing when backend is not available
-const mockDashboardData: DashboardData = {
-  todaysAppointments: [
-    {
-      id: '1',
-      patient_id: '1',
-      appointment_date: new Date().toISOString().split('T')[0],
-      appointment_time: '08:00:00',
-      duration: 30,
-      appointment_type: 'Weekly Visit',
-      status: 'scheduled',
-      reason: 'Regular checkup',
-      notes: 'Patient requires braces adjustment',
-      first_name: 'Guy',
-      last_name: 'Hawkins',
-      phone: '+91-9876543210',
-      gender: 'Male'
-    },
-    {
-      id: '2',
-      patient_id: '2',
-      appointment_date: new Date().toISOString().split('T')[0],
-      appointment_time: '10:00:00',
-      duration: 45,
-      appointment_type: 'Weekly Visit',
-      status: 'scheduled',
-      reason: 'Regular checkup',
-      notes: 'Cleaning and polishing',
-      first_name: 'Jane',
-      last_name: 'Cooper',
-      phone: '+91-9876543211',
-      gender: 'Female'
-    },
-    {
-      id: '3',
-      patient_id: '3',
-      appointment_date: new Date().toISOString().split('T')[0],
-      appointment_time: '14:00:00',
-      duration: 30,
-      appointment_type: 'Weekly Visit',
-      status: 'scheduled',
-      reason: 'Follow-up visit',
-      notes: 'Check cavity filling',
-      first_name: 'Leslie',
-      last_name: 'Alexander',
-      phone: '+91-9876543212',
-      gender: 'Male'
-    },
-    {
-      id: '4',
-      patient_id: '4',
-      appointment_date: new Date().toISOString().split('T')[0],
-      appointment_time: '16:00:00',
-      duration: 30,
-      appointment_type: 'Routine Checkup',
-      status: 'scheduled',
-      reason: 'Annual checkup',
-      notes: 'First visit - comprehensive examination',
-      first_name: 'Jenny',
-      last_name: 'Wilson',
-      phone: '+91-9876543213',
-      gender: 'Female'
-    }
-  ],
-  calendarData: [
-    { appointment_date: new Date().toISOString().split('T')[0], count: 4 },
-    { appointment_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], count: 3 },
-    { appointment_date: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0], count: 2 }
-  ],
-  stats: {
-    todayVisits: 790,
-    newPatientsToday: 750,
-    totalAppointmentsToday: 4,
-    totalPatients: 1250
-  },
-  currentDate: {
-    month: new Date().getMonth() + 1,
-    year: new Date().getFullYear(),
-    today: new Date().toISOString().split('T')[0]
-  }
-}
+const today = new Date().toISOString().split('T')[0]
+const dateIn = (days: number) => new Date(Date.now() + days * 86400000).toISOString().split('T')[0]
+const mockPatients: Patient[] = [
+  ['Aarav', 'Sharma', 'Active orthodontic treatment'], ['Meera', 'Cooper', 'Upcoming follow-up'], ['Kabir', 'Alexander', 'Needs filling review'], ['Ananya', 'Wilson', 'New patient'], ['Rohan', 'Fox', 'Requires treatment plan'],
+  ['Isha', 'Howard', 'Preventive care'], ['Vihaan', 'Williamson', 'Implant review'], ['Tara', 'Simmons', 'Follow-up needed'], ['Dev', 'Patel', 'Overdue cleaning'], ['Zoya', 'Khan', 'Minor patient; guardian consent required'],
+].map(([first_name, last_name, notes], index) => ({ id: `demo-patient-${index + 1}`, first_name, last_name, notes, phone: `+91-900000000${index + 1}`, email: `${first_name.toLowerCase()}@example.test`, gender: index % 2 ? 'Female' : 'Male', last_visit: index === 3 ? null : dateIn(-(index + 2)), next_appointment: [1, 4, 6, 7, 9].includes(index) ? dateIn(index + 3) : null }))
+const mockAppointments: Appointment[] = [
+  ['08:00:00', 0, 'Checkup', 'Regular checkup'], ['10:00:00', 1, 'Cleaning', 'Preventive cleaning'], ['14:00:00', 2, 'Cavity Filling', 'Filling review'], ['16:00:00', 3, 'Consultation', 'New patient assessment'],
+].map(([appointment_time, patientIndex, appointment_type, reason], index) => { const patient = mockPatients[Number(patientIndex)]; return { id: `demo-appointment-${index + 1}`, patient_id: patient.id, appointment_date: today, appointment_time: String(appointment_time), duration: 30, appointment_type: String(appointment_type), status: index === 2 ? 'in_progress' : 'scheduled', reason: String(reason), notes: '', first_name: patient.first_name, last_name: patient.last_name, phone: patient.phone || '', gender: patient.gender || '' } })
+const mockDashboardData: DashboardData = { todaysAppointments: mockAppointments, calendarData: [{ appointment_date: today, count: 4 }, { appointment_date: dateIn(1), count: 2 }, { appointment_date: dateIn(2), count: 1 }], upcomingFollowUps: mockPatients.filter((patient) => patient.next_appointment).slice(0, 5), stats: { todayVisits: 4, newPatientsToday: 1, totalAppointmentsToday: 4, totalPatients: mockPatients.length }, currentDate: { month: new Date().getMonth() + 1, year: new Date().getFullYear(), today } }
+const mockSettings: ClinicSettings = { clinic_name: 'V.P.S. Dental & Oral Care', clinic_email: 'info@vpsdental.com', phone: '+91-XXXXXXXXXX', address: { city: 'Kanpur', state: 'Uttar Pradesh', country: 'India' }, branding: { primaryColor: '#005db6', accentColor: '#a23858', logo: '🦷' }, working_hours: { monday: '09:00-18:00', saturday: '10:00-14:00' }, appointment_settings: { duration: 45, bufferMinutes: 10, emergencySlots: 2 }, notifications: { emailAlerts: true, smsReminders: true }, timezone: 'Asia/Kolkata' }
+const mockInventory: InventoryItem[] = [
+  { id: 'demo-1', name: 'Dental Examination Kit', category: 'Diagnostic', quantity: 24, reorder_level: 10, unit: 'kits', low_stock: false },
+  { id: 'demo-2', name: 'Composite Resin A2', category: 'Restorative', quantity: 8, reorder_level: 10, unit: 'syringes', low_stock: true },
+  { id: 'demo-3', name: 'Nitrile Examination Gloves', category: 'Consumables', quantity: 12, reorder_level: 15, unit: 'boxes', low_stock: true },
+]
 
 export class DashboardService {
-  private static async fetchWithAuth(url: string, options: RequestInit = {}) {
+  private static async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = localStorage.getItem('accessToken')
-    
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers
-    }
-
-    const response = await fetch(url, { ...options, headers })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    
-    return response.json()
+    const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(body.message || `Request failed (${response.status})`)
+    return body.data as T
   }
 
-  static async getDashboardData(): Promise<DashboardData> {
-    try {
-      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/v1/patients/dashboard`)
-      return response.data
-    } catch (error) {
-      console.warn('Backend not available, using mock data:', error)
-      // Return mock data for development
-      return mockDashboardData
-    }
-  }
+  static async getDashboardData(): Promise<DashboardData> { try { return await this.request<DashboardData>('/api/v1/patients/dashboard') } catch (error) { if (!DEMO_MODE) throw error; console.warn('Using explicit demo dashboard data', error); return mockDashboardData } }
+  static async getPatients(search = '', limit = 25, offset = 0): Promise<{ data: Patient[]; total: number }> { try { const query = new URLSearchParams({ limit: String(limit), offset: String(offset), ...(search ? { search } : {}) }); const response = await this.requestBody<{ data: Patient[]; meta?: { total?: number } }>(`/api/v1/patients/patients?${query}`); return { data: response.data, total: response.meta?.total ?? response.data.length } } catch (error) { if (!DEMO_MODE) throw error; const needle = search.toLowerCase(); const filtered = mockPatients.filter((patient) => `${patient.first_name} ${patient.last_name} ${patient.phone} ${patient.email}`.toLowerCase().includes(needle)); return { data: filtered.slice(offset, offset + limit), total: filtered.length } } }
+  static async getAppointments(from: string, to: string): Promise<Appointment[]> { try { return await this.request<Appointment[]>(`/api/v1/patients/appointments?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`) } catch (error) { if (!DEMO_MODE) throw error; return mockAppointments.filter((appointment) => appointment.appointment_date >= from && appointment.appointment_date <= to) } }
+  static async getTodaysAppointments(): Promise<Appointment[]> { try { return await this.request<Appointment[]>('/api/v1/patients/appointments/today') } catch (error) { if (!DEMO_MODE) throw error; return mockAppointments } }
+  static async createBooking(bookingData: unknown) { try { return await this.request<{ patientId: string; appointmentId: string }>('/api/v1/patients/bookings', { method: 'POST', body: JSON.stringify(bookingData) }) } catch (error) { if (!DEMO_MODE) throw error; return { patientId: `demo-${Date.now()}`, appointmentId: `demo-${Date.now()}` } } }
+  static async getSettings(): Promise<ClinicSettings | null> { try { return await this.request<ClinicSettings | null>('/api/v1/patients/settings') } catch (error) { if (!DEMO_MODE) throw error; try { return JSON.parse(localStorage.getItem('clinicSettingsDraft') || 'null') as ClinicSettings | null || mockSettings } catch { return mockSettings } } }
+  static async updateSettings(settings: Record<string, unknown>): Promise<ClinicSettings> { try { return await this.request<ClinicSettings>('/api/v1/patients/settings', { method: 'PUT', body: JSON.stringify(settings) }) } catch (error) { if (!DEMO_MODE) throw error; const current = await this.getSettings() || mockSettings; const next = { ...current, clinic_name: settings.clinicName || current.clinic_name, clinic_email: settings.clinicEmail || current.clinic_email, notifications: settings.notifications || current.notifications } as ClinicSettings; localStorage.setItem('clinicSettingsDraft', JSON.stringify(next)); return next } }
+  static async getInventory(search = ''): Promise<InventoryItem[]> { try { return await this.request<InventoryItem[]>(`/api/v1/patients/inventory?search=${encodeURIComponent(search)}`) } catch (error) { if (!DEMO_MODE) throw error; return mockInventory.filter((item) => `${item.name} ${item.category}`.toLowerCase().includes(search.toLowerCase())) } }
+  static async createInventory(item: Omit<InventoryItem, 'id' | 'low_stock'>) { return this.request<InventoryItem>('/api/v1/patients/inventory', { method: 'POST', body: JSON.stringify({ ...item, reorderLevel: item.reorder_level }) }) }
+  static async updateInventory(id: string, changes: Partial<InventoryItem>) { return this.request<InventoryItem>(`/api/v1/patients/inventory/${id}`, { method: 'PATCH', body: JSON.stringify(changes) }) }
+  static async deleteInventory(id: string) { return this.request<{ id: string }>(`/api/v1/patients/inventory/${id}`, { method: 'DELETE' }) }
 
-  static async getTodaysAppointments(): Promise<Appointment[]> {
-    try {
-      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/v1/patients/appointments/today`)
-      return response.data
-    } catch (error) {
-      console.warn('Backend not available, using mock data:', error)
-      return mockDashboardData.todaysAppointments
-    }
-  }
-
-  static async createBooking(bookingData: any): Promise<any> {
-    try {
-      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/v1/patients/bookings`, {
-        method: 'POST',
-        body: JSON.stringify(bookingData)
-      })
-      return response
-    } catch (error) {
-      console.warn('Backend not available, simulating booking creation:', error)
-      // For development, simulate success
-      return {
-        success: true,
-        message: 'Booking created (mock)',
-        data: {
-          patientId: Math.random().toString(36).substring(7),
-          appointmentId: Math.random().toString(36).substring(7),
-          appointmentDate: bookingData.appointmentDate,
-          appointmentTime: bookingData.appointmentTime
-        }
-      }
-    }
+  private static async requestBody<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(body.message || `Request failed (${response.status})`)
+    return body as T
   }
 }

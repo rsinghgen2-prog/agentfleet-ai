@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../config/database';
 import { logger } from '../utils/logger';
-import { SUPER_ADMIN } from '../config/constants';
+import { getJwtRefreshSecret, getJwtSecret, SUPER_ADMIN } from '../config/constants';
+import { quoteIdentifier } from '../utils/sql';
 
 interface LoginRequest {
   email: string;
@@ -28,6 +29,10 @@ export class AuthController {
   async login(req: Request, res: Response, next: NextFunction) {
     try {
       const { email, password, tenantSlug }: LoginRequest = req.body;
+
+      if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
+        return res.status(400).json({ success: false, message: 'Email and password are required' });
+      }
 
       // 1. Check if Super Admin
       if (email.toLowerCase() === SUPER_ADMIN.email.toLowerCase()) {
@@ -65,8 +70,8 @@ export class AuthController {
 
       // 3. Query user from tenant schema
       const userQuery = await pool.query(
-        `SELECT id, email, password_hash, full_name, role, permissions, is_active 
-         FROM ${tenant.schema_name}.users 
+        `SELECT id, email, password_hash, full_name, role, permissions, is_active
+         FROM ${quoteIdentifier(tenant.schema_name)}.users
          WHERE email = $1`,
         [email]
       );
@@ -93,7 +98,7 @@ export class AuthController {
       if (!isValidPassword) {
         // Increment failed attempts
         await pool.query(
-          `UPDATE ${tenant.schema_name}.users 
+          `UPDATE ${quoteIdentifier(tenant.schema_name)}.users
            SET failed_login_attempts = failed_login_attempts + 1 
            WHERE id = $1`,
           [user.id]
@@ -107,7 +112,7 @@ export class AuthController {
 
       // 5. Update last login
       await pool.query(
-        `UPDATE ${tenant.schema_name}.users 
+        `UPDATE ${quoteIdentifier(tenant.schema_name)}.users
          SET last_login_at = NOW(), last_login_ip = $1, failed_login_attempts = 0 
          WHERE id = $2`,
         [req.ip, user.id]
@@ -123,10 +128,17 @@ export class AuthController {
         isSuperAdmin: false
       });
 
-      const refreshToken = AuthController.generateRefreshToken(user.id);
+      const refreshToken = AuthController.generateRefreshToken({
+        userId: user.id,
+        email: user.email,
+        tenantId: tenant.id,
+        role: user.role,
+        permissions: user.permissions || [],
+        isSuperAdmin: false,
+      });
 
       // 7. Determine dashboard route based on role
-      const dashboardRoute = AuthController.getDashboardRoute(user.role, tenant.schema_name);
+      const dashboardRoute = AuthController.getDashboardRoute(user.role);
 
       return res.json({
         success: true,
@@ -198,7 +210,13 @@ export class AuthController {
       isSuperAdmin: true
     });
 
-    const refreshToken = AuthController.generateRefreshToken(superAdmin.id);
+    const refreshToken = AuthController.generateRefreshToken({
+      userId: superAdmin.id,
+      email: superAdmin.email,
+      role: 'super_admin',
+      permissions: ['*'],
+      isSuperAdmin: true,
+    });
 
     return res.json({
       success: true,
@@ -226,7 +244,7 @@ export class AuthController {
   private static generateAccessToken(payload: JWTPayload): string {
     return jwt.sign(
       payload,
-      process.env.JWT_SECRET || 'your-secret-key',
+      getJwtSecret(),
       { expiresIn: '15m' }
     );
   }
@@ -234,10 +252,10 @@ export class AuthController {
   /**
    * Generate Refresh Token (7 days)
    */
-  private static generateRefreshToken(userId: string): string {
+  private static generateRefreshToken(payload: JWTPayload): string {
     return jwt.sign(
-      { userId, type: 'refresh' },
-      process.env.JWT_REFRESH_SECRET || 'your-refresh-secret',
+      { ...payload, type: 'refresh' },
+      getJwtRefreshSecret(),
       { expiresIn: '7d' }
     );
   }
@@ -245,7 +263,7 @@ export class AuthController {
   /**
    * Determine dashboard route based on role
    */
-  private static getDashboardRoute(role: string, schemaName: string): string {
+  private static getDashboardRoute(role: string): string {
     switch (role) {
       case 'admin':
         return '/admin-dashboard';
@@ -265,7 +283,7 @@ export class AuthController {
    * Refresh Token
    * POST /api/v1/auth/refresh
    */
-  async refreshToken(req: Request, res: Response, next: NextFunction) {
+  async refreshToken(req: Request, res: Response, _next: NextFunction) {
     try {
       const { refreshToken } = req.body;
 
@@ -279,8 +297,8 @@ export class AuthController {
       // Verify refresh token
       const decoded = jwt.verify(
         refreshToken,
-        process.env.JWT_REFRESH_SECRET || 'your-refresh-secret'
-      ) as { userId: string; type: string };
+        getJwtRefreshSecret()
+      ) as JWTPayload & { type: string };
 
       if (decoded.type !== 'refresh') {
         return res.status(401).json({
@@ -289,11 +307,23 @@ export class AuthController {
         });
       }
 
-      // TODO: Get user details and generate new access token
-      // For now, return success
+      if (!decoded.userId || !decoded.email || !decoded.role) {
+        return res.status(401).json({ success: false, message: 'Invalid refresh token payload' });
+      }
+
+      const accessToken = AuthController.generateAccessToken({
+        userId: decoded.userId,
+        email: decoded.email,
+        tenantId: decoded.tenantId,
+        role: decoded.role,
+        permissions: decoded.permissions || [],
+        isSuperAdmin: decoded.isSuperAdmin === true,
+      });
+
       return res.json({
         success: true,
-        message: 'Token refreshed successfully'
+        message: 'Token refreshed successfully',
+        data: { accessToken },
       });
 
     } catch (error) {

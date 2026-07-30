@@ -131,7 +131,8 @@ body {
 }
 
 .dental-stitch-app {
-  --dental-primary: #005db6;
+  --tenant-primary: #005db6;
+  --dental-primary: var(--tenant-primary);
   --dental-primary-container: #5897f4;
   --dental-secondary: #a23858;
   --dental-surface: #f7f9ff;
