@@ -141,17 +141,59 @@ body {
   --dental-surface-highest: #dce3ec;
   --dental-text: #151c23;
   --dental-muted: #424752;
+  --dental-card: #ffffff;
+  --dental-input: #ffffff;
   min-height: 100vh;
   color: var(--dental-text);
   background: linear-gradient(135deg, #ffffff 0%, #f0f5fa 100%);
   font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
 }
 
+.dark .dental-stitch-app {
+  --dental-surface: #111827;
+  --dental-surface-low: #172235;
+  --dental-surface-high: #24334a;
+  --dental-surface-highest: #2d3b52;
+  --dental-text: #e5edf8;
+  --dental-muted: #aab7c9;
+  --dental-card: #101b2d;
+  --dental-input: #172235;
+  background: linear-gradient(135deg, #0b1424 0%, #111d31 100%);
+}
+
 .dental-stitch-card {
-  background: #ffffff;
+  background: var(--dental-card);
   border: 1px solid rgba(194, 198, 212, 0.2);
   border-radius: 24px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+}
+
+/* Dental screens contain Stitch-generated utility colors. Keep those screens
+   readable when the global theme changes without changing tenant branding. */
+.dark .dental-stitch-app .dental-stitch-card,
+.dark .dental-stitch-app input,
+.dark .dental-stitch-app select,
+.dark .dental-stitch-app textarea,
+.dark .dental-stitch-app [class*="bg-white"] {
+  background-color: var(--dental-card) !important;
+  color: var(--dental-text) !important;
+}
+.dark .dental-stitch-app [class*="bg-[#f7f9ff]"],
+.dark .dental-stitch-app [class*="bg-[#edf4fe]"],
+.dark .dental-stitch-app [class*="bg-[#e2e9f2]"],
+.dark .dental-stitch-app [class*="bg-[#dce3ec]"] {
+  background-color: var(--dental-surface-high) !important;
+}
+.dark .dental-stitch-app [class*="text-[#151c23]"],
+.dark .dental-stitch-app [class*="text-[#424752]"],
+.dark .dental-stitch-app [class*="text-[#727783]"] {
+  color: var(--dental-text) !important;
+}
+.dark .dental-stitch-app [class*="text-[#005db6]"] {
+  color: var(--tenant-primary) !important;
+}
+.dark .dental-stitch-app [class*="border-[#c2c6d4]"] {
+  border-color: rgba(148, 163, 184, 0.24) !important;
 }
 
 .dental-stitch-card:hover {

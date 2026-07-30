@@ -1,7 +1,8 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import type { CSSProperties } from 'react'
-import { Bell, CalendarDays, CircleHelp, Grid2X2, LogOut, Menu, Package, Search, Settings, Users } from 'lucide-react'
+import { Bell, CalendarDays, CircleHelp, Grid2X2, LogOut, Menu, Moon, Package, Search, Settings, Sun, Users } from 'lucide-react'
 import { useDentalDashboardData } from '../../hooks/useDentalDashboardData'
+import { useTheme } from '../../context/ThemeContext'
 
 const navItems = [
   { label: 'Dashboard', to: '/dental-client', icon: Grid2X2, end: true },
@@ -18,6 +19,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 
 export default function DentalClientShell() {
   const navigate = useNavigate()
+  const { isDark, toggleTheme } = useTheme()
   const { client, settings } = useDentalDashboardData()
   const clientName = (() => {
     try { return JSON.parse(localStorage.getItem('clientData') || '{}').clientName || 'Dr. Rajeev Pratap Singh' } catch { return 'Dr. Rajeev Pratap Singh' }
@@ -67,6 +69,7 @@ export default function DentalClientShell() {
             <span className="truncate text-lg font-bold text-[#005db6] sm:hidden">{clinicName}</span>
           </div>
           <div className="flex items-center gap-3">
+            <button aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} onClick={toggleTheme} className="rounded-full bg-white p-2.5 text-[#424752] shadow-sm hover:bg-[#e2e9f2] dark:bg-[#172235] dark:text-slate-200 dark:hover:bg-[#24334a]">{isDark ? <Sun size={18} /> : <Moon size={18} />}</button>
             <button aria-label="Notifications" className="relative rounded-full bg-white p-2.5 text-[#424752] shadow-sm hover:bg-[#e2e9f2]"><Bell size={18} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#a23858]" /></button>
             <div className="flex items-center gap-2 rounded-full bg-white p-1 pr-3 shadow-sm"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#d6e3ff] text-xs font-bold text-[#005db6]">{initials}</div><span className="hidden max-w-32 truncate text-xs font-bold text-[#151c23] lg:block">{clientName}</span></div>
           </div>

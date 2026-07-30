@@ -13,7 +13,7 @@ const formatTime = (time: string) => {
 const initials = (appointment: Appointment) => `${appointment.first_name[0]}${appointment.last_name[0]}`
 
 export default function DentalClientStitchDashboard() {
-  const { client, data, loading, refresh } = useDentalDashboardData()
+  const { client, data, loading, error, refresh } = useDentalDashboardData()
   const [bookingOpen, setBookingOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const appointments = data?.todaysAppointments || []
@@ -32,6 +32,7 @@ export default function DentalClientStitchDashboard() {
         <div><p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-[#424752]">Dashboard overview</p><h1 className="text-2xl font-bold tracking-tight text-[#151c23] sm:text-3xl">Good Morning <span className="text-[#005db6]">{displayName}</span> 👋</h1></div>
         <button onClick={() => setBookingOpen(true)} className="hidden items-center gap-2 rounded-xl bg-[#005db6] px-4 py-3 text-xs font-bold text-white shadow-md transition hover:bg-[#00468b] sm:flex"><Plus size={17} /> New Patient Booking</button>
       </div>
+      {error && <div role="alert" className="mb-5 flex flex-col gap-3 rounded-2xl border border-[#a23858]/20 bg-[#fe81a1]/10 p-4 text-sm text-[#761538] sm:flex-row sm:items-center sm:justify-between"><div><b className="block">Clinic data could not be loaded.</b><span>{error} Check the authentication/API environment and tenant database seed.</span></div><button onClick={() => void refresh()} className="shrink-0 rounded-xl bg-[#a23858] px-4 py-2 text-xs font-bold text-white">Retry</button></div>}
       <button onClick={() => setBookingOpen(true)} className="mb-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#005db6] px-4 py-3 text-sm font-bold text-white shadow-md sm:hidden"><Plus size={18} /> New Patient Booking</button>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">

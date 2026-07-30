@@ -5,6 +5,9 @@ import { Mail, Lock, ArrowLeft, Sparkles, AlertCircle, Check } from 'lucide-reac
 import { SUPER_ADMIN, validateSuperAdmin } from '../config/superAdmin'
 import { getClientByEmail, validateClient } from '../config/clients'
 
+const DEMO_MODE = import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === 'true'
+const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '')
+
 const Login = () => {
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
@@ -38,19 +41,25 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const email = formData.email.trim().toLowerCase()
+    const password = formData.password
+
+    // Do not let a previous tenant's token authorize this login attempt.
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('refreshToken')
 
     // Save or clear credentials based on Remember Me checkbox
     if (rememberMe) {
-      localStorage.setItem('savedEmail', formData.email)
+      localStorage.setItem('savedEmail', email)
     } else {
       localStorage.removeItem('savedEmail')
     }
 
     // 1. Check if Super Admin
-    if (validateSuperAdmin(formData.email, formData.password)) {
+    if (validateSuperAdmin(email, password)) {
       localStorage.setItem('userRegistration', JSON.stringify(SUPER_ADMIN))
       localStorage.setItem('isLoggedIn', 'true')
-      localStorage.setItem('currentUser', formData.email)
+      localStorage.setItem('currentUser', email)
       localStorage.setItem('isSuperAdmin', 'true')
       localStorage.setItem('userType', 'super-admin')
       navigate('/dashboard')
@@ -58,37 +67,40 @@ const Login = () => {
     }
 
     // 2. Check if Client (Multi-tenant)
-    const client = getClientByEmail(formData.email)
+    const client = getClientByEmail(email)
     if (client) {
       let authenticated = false
       try {
-        const authResponse = await fetch(`${import.meta.env.VITE_AUTH_API_URL || 'http://localhost:3001'}/api/v1/auth/login`, {
+        if (!AUTH_API_URL) {
+          throw new Error('Authentication service URL is not configured')
+        }
+        const authResponse = await fetch(`${AUTH_API_URL}/api/v1/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email, password: formData.password, tenantSlug: client.tenantSlug }),
+          body: JSON.stringify({ email, password, tenantSlug: client.tenantSlug }),
         })
         const authBody = await authResponse.json().catch(() => ({}))
         if (authResponse.ok && authBody.data?.tokens?.accessToken) {
           localStorage.setItem('accessToken', authBody.data.tokens.accessToken)
           if (authBody.data.tokens.refreshToken) localStorage.setItem('refreshToken', authBody.data.tokens.refreshToken)
           authenticated = true
-        } else if (!import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE !== 'true') {
+        } else if (!DEMO_MODE) {
           throw new Error(authBody.message || 'Authentication service rejected the login')
         }
       } catch (authError) {
-        if (!import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE !== 'true') {
+        if (!DEMO_MODE) {
           setError(authError instanceof Error ? authError.message : 'Unable to reach authentication service')
           return
         }
       }
-      if (!authenticated && !validateClient(formData.email, formData.password)) {
+      if (!authenticated && !validateClient(email, password)) {
         setError('Invalid email or password')
         return
       }
       localStorage.setItem('isLoggedIn', 'true')
       localStorage.setItem('userType', 'client')
       localStorage.setItem('clientData', JSON.stringify(client))
-      localStorage.setItem('currentUser', formData.email)
+      localStorage.setItem('currentUser', email)
 
       // Route to appropriate client dashboard based on dashboard type
       const dashboardRoute = client.dashboardType === 'dental' ? '/dental-client' : '/admin-dashboard'
@@ -107,12 +119,12 @@ const Login = () => {
     const userData = JSON.parse(storedRegistration)
 
     // Validate credentials
-    if (formData.email !== userData.email) {
+    if (email !== String(userData.email).trim().toLowerCase()) {
       setError('Invalid email or password')
       return
     }
 
-    if (formData.password !== userData.password) {
+    if (password !== userData.password) {
       setError('Invalid email or password')
       return
     }
