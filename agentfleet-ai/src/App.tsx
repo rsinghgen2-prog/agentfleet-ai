@@ -16,6 +16,7 @@ import IndustryDashboard from './pages/IndustryDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import DentalClientStitchDashboard from './pages/DentalClientStitchDashboard'
 import DentalClientPatients from './pages/DentalClientPatients'
+import PatientProfile from './pages/PatientProfile'
 import DentalClientSchedule from './pages/DentalClientSchedule'
 import DentalClientInventory from './pages/DentalClientInventory'
 import DentalClientSettings from './pages/DentalClientSettings'
@@ -94,6 +95,7 @@ function App() {
             <Route path="/dental-client" element={<ProtectedRoute allowedUserTypes={['client']}><DentalClientShell /></ProtectedRoute>}>
               <Route index element={<DentalClientStitchDashboard />} />
               <Route path="patients" element={<DentalClientPatients />} />
+              <Route path="patients/:id" element={<PatientProfile />} />
               <Route path="schedule" element={<DentalClientSchedule />} />
               <Route path="inventory" element={<DentalClientInventory />} />
               <Route path="settings" element={<DentalClientSettings />} />

@@ -158,6 +158,79 @@ CREATE TABLE IF NOT EXISTS client_notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Patient profile clinical records and lab-order dispatch outbox.
+CREATE TABLE IF NOT EXISTS prescriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  medication_name VARCHAR(255) NOT NULL,
+  dosage VARCHAR(100),
+  frequency VARCHAR(100),
+  duration VARCHAR(100),
+  instructions TEXT,
+  prescribed_by VARCHAR(255),
+  start_date DATE,
+  end_date DATE,
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS patient_reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  report_type VARCHAR(100),
+  description TEXT,
+  report_date DATE,
+  attachment_name VARCHAR(255),
+  attachment_mime_type VARCHAR(150),
+  attachment_size INTEGER,
+  attachment_data BYTEA,
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS lab_orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  order_number VARCHAR(64) NOT NULL UNIQUE,
+  test_name VARCHAR(255) NOT NULL,
+  teeth_creation_service TEXT,
+  lab_name VARCHAR(255) NOT NULL,
+  lab_email VARCHAR(255),
+  lab_phone VARCHAR(50),
+  priority VARCHAR(30) NOT NULL DEFAULT 'routine',
+  instructions TEXT,
+  attachment_name VARCHAR(255),
+  attachment_mime_type VARCHAR(150),
+  attachment_size INTEGER,
+  attachment_data BYTEA,
+  copy_to_patient BOOLEAN NOT NULL DEFAULT TRUE,
+  copy_to_clinic BOOLEAN NOT NULL DEFAULT FALSE,
+  status VARCHAR(30) NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'processing', 'completed', 'cancelled')),
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (lab_email IS NOT NULL OR lab_phone IS NOT NULL)
+);
+
+CREATE TABLE IF NOT EXISTS lab_order_dispatches (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lab_order_id UUID NOT NULL REFERENCES lab_orders(id) ON DELETE CASCADE,
+  recipient_type VARCHAR(20) NOT NULL CHECK (recipient_type IN ('lab', 'patient', 'clinic')),
+  channel VARCHAR(10) NOT NULL CHECK (channel IN ('email', 'sms')),
+  recipient VARCHAR(255) NOT NULL,
+  recipient_name VARCHAR(255),
+  status VARCHAR(20) NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'processing', 'sent', 'failed')),
+  attachment_name VARCHAR(255),
+  attachment_mime_type VARCHAR(150),
+  attachment_size INTEGER,
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_patients_active_name ON patients (is_active, last_name, first_name);
 CREATE INDEX IF NOT EXISTS idx_patients_search_phone ON patients (phone);
 CREATE INDEX IF NOT EXISTS idx_appointments_date_status ON appointments (appointment_date, status);
@@ -168,6 +241,10 @@ CREATE INDEX IF NOT EXISTS idx_support_conversations_owner ON support_conversati
 CREATE INDEX IF NOT EXISTS idx_support_messages_conversation ON support_messages (conversation_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_hospital_directory_owner ON hospital_directory (owner_user_id, is_active, relationship);
 CREATE INDEX IF NOT EXISTS idx_client_notifications_unread ON client_notifications (recipient_user_id, is_read, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_patient ON prescriptions (patient_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_patient_reports_patient ON patient_reports (patient_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lab_orders_patient ON lab_orders (patient_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lab_order_dispatches_order ON lab_order_dispatches (lab_order_id, created_at DESC);
 
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS TRIGGER AS $$
 BEGIN
@@ -188,3 +265,11 @@ DROP TRIGGER IF EXISTS hospital_directory_updated_at ON hospital_directory;
 CREATE TRIGGER hospital_directory_updated_at BEFORE UPDATE ON hospital_directory FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS support_conversations_updated_at ON support_conversations;
 CREATE TRIGGER support_conversations_updated_at BEFORE UPDATE ON support_conversations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS prescriptions_updated_at ON prescriptions;
+CREATE TRIGGER prescriptions_updated_at BEFORE UPDATE ON prescriptions FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS patient_reports_updated_at ON patient_reports;
+CREATE TRIGGER patient_reports_updated_at BEFORE UPDATE ON patient_reports FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS lab_orders_updated_at ON lab_orders;
+CREATE TRIGGER lab_orders_updated_at BEFORE UPDATE ON lab_orders FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS lab_order_dispatches_updated_at ON lab_order_dispatches;
+CREATE TRIGGER lab_order_dispatches_updated_at BEFORE UPDATE ON lab_order_dispatches FOR EACH ROW EXECUTE FUNCTION set_updated_at();

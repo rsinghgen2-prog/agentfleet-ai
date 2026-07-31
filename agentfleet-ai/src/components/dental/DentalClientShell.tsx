@@ -1,5 +1,5 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useState, type CSSProperties } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { CalendarDays, CircleHelp, Grid2X2, LogOut, Menu, Moon, Package, Search, Settings, Sun, Users } from 'lucide-react'
 import { useDentalDashboardData } from '../../hooks/useDentalDashboardData'
 import { useTheme } from '../../context/ThemeContext'
@@ -19,11 +19,15 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? 'bg-[var(--tenant-primary)] text-white shadow-md' : 'text-[#424752] hover:bg-[#e2e9f2]'
   }`
 
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'v1.0.0'
+
 export default function DentalClientShell() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { isDark, toggleTheme } = useTheme()
   const { client, settings } = useDentalDashboardData()
   const [supportOpen, setSupportOpen] = useState(false)
+  const [search, setSearch] = useState('')
   const clientName = (() => {
     try { return JSON.parse(localStorage.getItem('clientData') || '{}').clientName || 'Dr. Rajeev Pratap Singh' } catch { return 'Dr. Rajeev Pratap Singh' }
   })()
@@ -31,6 +35,16 @@ export default function DentalClientShell() {
   const logo = settings?.branding?.logo || client?.logo || '🦷'
   const primaryColor = settings?.branding?.primaryColor || client?.primaryColor || '#005db6'
   const initials = clientName.split(' ').map((part: string) => part[0]).join('').slice(0, 2)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    setSearch(location.pathname.startsWith('/dental-client/patients') ? params.get('search') || '' : '')
+  }, [location.pathname, location.search])
+
+  const submitSearch = () => {
+    const query = search.trim()
+    navigate(query ? `/dental-client/patients?search=${encodeURIComponent(query)}` : '/dental-client/patients')
+  }
 
   const logout = () => {
     localStorage.removeItem('isLoggedIn')
@@ -66,8 +80,8 @@ export default function DentalClientShell() {
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Menu className="text-[#005db6] md:hidden" size={22} />
             <div className="relative hidden w-full max-w-xl sm:block">
-              <input aria-label="Search patients or appointments" className="h-11 w-full rounded-2xl border-0 bg-white px-5 pr-12 text-sm shadow-sm outline-none focus:ring-2 focus:ring-[#005db6]/20" placeholder="Find Patients or Appointments" />
-              <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-[#727783]" size={18} />
+              <input aria-label="Search patients or appointments" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitSearch() }} className="h-11 w-full rounded-2xl border-0 bg-white px-5 pr-12 text-sm shadow-sm outline-none focus:ring-2 focus:ring-[#005db6]/20" placeholder="Find Patients or Appointments" />
+              <button type="button" aria-label="Search" onClick={submitSearch} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-[#727783] hover:bg-[#e2e9f2] hover:text-[#005db6]"><Search size={18} /></button>
             </div>
             <span className="truncate text-lg font-bold text-[#005db6] sm:hidden">{clinicName}</span>
           </div>
@@ -78,6 +92,9 @@ export default function DentalClientShell() {
           </div>
         </header>
         <Outlet />
+        <footer className="border-t border-[#c2c6d4]/30 px-4 py-3 text-center text-[11px] text-[#727783] sm:px-6 lg:px-8">
+          Powered by <span className="font-semibold text-[#424752]">Avighana Technology Pvt Ltd</span><span className="mx-2">·</span>{APP_VERSION}
+        </footer>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-[#c2c6d4]/30 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-md md:hidden">
