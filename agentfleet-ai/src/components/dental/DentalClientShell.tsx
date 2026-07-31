@@ -1,8 +1,10 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import type { CSSProperties } from 'react'
-import { Bell, CalendarDays, CircleHelp, Grid2X2, LogOut, Menu, Moon, Package, Search, Settings, Sun, Users } from 'lucide-react'
+import { useState, type CSSProperties } from 'react'
+import { CalendarDays, CircleHelp, Grid2X2, LogOut, Menu, Moon, Package, Search, Settings, Sun, Users } from 'lucide-react'
 import { useDentalDashboardData } from '../../hooks/useDentalDashboardData'
 import { useTheme } from '../../context/ThemeContext'
+import DentalSupportChat from './DentalSupportChat'
+import DentalNotificationCenter from './DentalNotificationCenter'
 
 const navItems = [
   { label: 'Dashboard', to: '/dental-client', icon: Grid2X2, end: true },
@@ -21,6 +23,7 @@ export default function DentalClientShell() {
   const navigate = useNavigate()
   const { isDark, toggleTheme } = useTheme()
   const { client, settings } = useDentalDashboardData()
+  const [supportOpen, setSupportOpen] = useState(false)
   const clientName = (() => {
     try { return JSON.parse(localStorage.getItem('clientData') || '{}').clientName || 'Dr. Rajeev Pratap Singh' } catch { return 'Dr. Rajeev Pratap Singh' }
   })()
@@ -53,7 +56,7 @@ export default function DentalClientShell() {
           {navItems.map(({ label, to, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={navClass}><Icon size={20} /><span className="hidden lg:block">{label}</span></NavLink>)}
         </nav>
         <div className="space-y-2 border-t border-[#c2c6d4]/40 pt-4">
-          <button className={navClass({ isActive: false })}><CircleHelp size={20} /><span className="hidden lg:block">Help</span></button>
+          <button onClick={() => setSupportOpen(true)} className={navClass({ isActive: supportOpen })}><CircleHelp size={20} /><span className="hidden lg:block">Help</span></button>
           <button onClick={logout} className={navClass({ isActive: false })}><LogOut size={20} /><span className="hidden lg:block">Logout</span></button>
         </div>
       </aside>
@@ -70,7 +73,7 @@ export default function DentalClientShell() {
           </div>
           <div className="flex items-center gap-3">
             <button aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} onClick={toggleTheme} className="rounded-full bg-white p-2.5 text-[#424752] shadow-sm hover:bg-[#e2e9f2] dark:bg-[#172235] dark:text-slate-200 dark:hover:bg-[#24334a]">{isDark ? <Sun size={18} /> : <Moon size={18} />}</button>
-            <button aria-label="Notifications" className="relative rounded-full bg-white p-2.5 text-[#424752] shadow-sm hover:bg-[#e2e9f2]"><Bell size={18} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#a23858]" /></button>
+            <DentalNotificationCenter />
             <div className="flex items-center gap-2 rounded-full bg-white p-1 pr-3 shadow-sm"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#d6e3ff] text-xs font-bold text-[#005db6]">{initials}</div><span className="hidden max-w-32 truncate text-xs font-bold text-[#151c23] lg:block">{clientName}</span></div>
           </div>
         </header>
@@ -80,6 +83,7 @@ export default function DentalClientShell() {
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-[#c2c6d4]/30 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-md md:hidden">
         {navItems.slice(0, 5).map(({ label, to, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `flex flex-col items-center gap-1 rounded-xl p-2 text-[10px] font-bold ${isActive ? 'bg-[#2a3138] text-white' : 'text-[#424752]'}`}><Icon size={18} /><span>{label}</span></NavLink>)}
       </nav>
+      <DentalSupportChat open={supportOpen} onClose={() => setSupportOpen(false)} />
     </div>
   )
 }

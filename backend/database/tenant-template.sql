@@ -112,12 +112,62 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS support_conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subject VARCHAR(160) NOT NULL DEFAULT 'Hospital support',
+  status VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  created_by UUID NOT NULL REFERENCES users(id),
+  assigned_to UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS support_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES support_conversations(id) ON DELETE CASCADE,
+  sender_id UUID NOT NULL REFERENCES users(id),
+  sender_role VARCHAR(50) NOT NULL,
+  body TEXT NOT NULL CHECK (length(body) BETWEEN 1 AND 5000),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS hospital_directory (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  relationship VARCHAR(20) NOT NULL DEFAULT 'partner' CHECK (relationship IN ('own', 'partner')),
+  specialty VARCHAR(160) NOT NULL DEFAULT 'General care',
+  address TEXT NOT NULL DEFAULT '',
+  city VARCHAR(100) NOT NULL DEFAULT '',
+  contact_name VARCHAR(160),
+  contact_phone VARCHAR(50),
+  owner_user_id UUID REFERENCES users(id),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS client_notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  recipient_user_id UUID NOT NULL REFERENCES users(id),
+  notification_type VARCHAR(20) NOT NULL CHECK (notification_type IN ('message', 'email', 'call')),
+  title VARCHAR(200) NOT NULL,
+  body TEXT NOT NULL,
+  customer_name VARCHAR(160),
+  customer_id UUID REFERENCES patients(id),
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_patients_active_name ON patients (is_active, last_name, first_name);
 CREATE INDEX IF NOT EXISTS idx_patients_search_phone ON patients (phone);
 CREATE INDEX IF NOT EXISTS idx_appointments_date_status ON appointments (appointment_date, status);
 CREATE INDEX IF NOT EXISTS idx_appointments_patient ON appointments (patient_id, appointment_date DESC);
 CREATE INDEX IF NOT EXISTS idx_inventory_active_category ON inventory_items (is_active, category);
 CREATE INDEX IF NOT EXISTS idx_dentist_notes_updated ON dentist_notes (updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_conversations_owner ON support_conversations (created_by, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_messages_conversation ON support_messages (conversation_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_hospital_directory_owner ON hospital_directory (owner_user_id, is_active, relationship);
+CREATE INDEX IF NOT EXISTS idx_client_notifications_unread ON client_notifications (recipient_user_id, is_read, created_at DESC);
 
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS TRIGGER AS $$
 BEGIN
@@ -134,3 +184,7 @@ DROP TRIGGER IF EXISTS inventory_updated_at ON inventory_items;
 CREATE TRIGGER inventory_updated_at BEFORE UPDATE ON inventory_items FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS dentist_notes_updated_at ON dentist_notes;
 CREATE TRIGGER dentist_notes_updated_at BEFORE UPDATE ON dentist_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS hospital_directory_updated_at ON hospital_directory;
+CREATE TRIGGER hospital_directory_updated_at BEFORE UPDATE ON hospital_directory FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS support_conversations_updated_at ON support_conversations;
+CREATE TRIGGER support_conversations_updated_at BEFORE UPDATE ON support_conversations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
