@@ -94,6 +94,8 @@ CREATE TABLE IF NOT EXISTS dentist_notes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title VARCHAR(160) NOT NULL,
   content TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '1 month'),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_by UUID REFERENCES users(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
