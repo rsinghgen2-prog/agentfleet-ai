@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState, type CSSProperties } from 'react'
-import { CalendarDays, CircleHelp, Grid2X2, LogOut, Menu, Moon, Package, Search, Settings, Sun, Users } from 'lucide-react'
+import { CalendarDays, CircleHelp, ClipboardList, Grid2X2, LogOut, Menu, Moon, Package, Search, Settings, Sun, Users } from 'lucide-react'
 import { useDentalDashboardData } from '../../hooks/useDentalDashboardData'
 import { useTheme } from '../../context/ThemeContext'
 import DentalSupportChat from './DentalSupportChat'
@@ -9,6 +9,7 @@ import DentalNotificationCenter from './DentalNotificationCenter'
 const navItems = [
   { label: 'Dashboard', to: '/dental-client', icon: Grid2X2, end: true },
   { label: 'Patients', to: '/dental-client/patients', icon: Users },
+  { label: 'Customer Details', to: '/dental-client/customers', icon: ClipboardList },
   { label: 'Schedule', to: '/dental-client/schedule', icon: CalendarDays },
   { label: 'Inventory', to: '/dental-client/inventory', icon: Package },
   { label: 'Settings', to: '/dental-client/settings', icon: Settings },
@@ -97,8 +98,8 @@ export default function DentalClientShell() {
         </footer>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-[#c2c6d4]/30 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-md md:hidden">
-        {navItems.slice(0, 5).map(({ label, to, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `flex flex-col items-center gap-1 rounded-xl p-2 text-[10px] font-bold ${isActive ? 'bg-[#2a3138] text-white' : 'text-[#424752]'}`}><Icon size={18} /><span>{label}</span></NavLink>)}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-start gap-1 overflow-x-auto border-t border-[#c2c6d4]/30 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-md md:hidden">
+        {navItems.map(({ label, to, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `flex min-w-[68px] shrink-0 flex-col items-center gap-1 rounded-xl p-2 text-[10px] font-bold ${isActive ? 'bg-[#2a3138] text-white' : 'text-[#424752]'}`}><Icon size={18} /><span>{label}</span></NavLink>)}
       </nav>
       <DentalSupportChat open={supportOpen} onClose={() => setSupportOpen(false)} />
     </div>

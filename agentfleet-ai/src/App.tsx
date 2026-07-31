@@ -17,6 +17,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import DentalClientStitchDashboard from './pages/DentalClientStitchDashboard'
 import DentalClientPatients from './pages/DentalClientPatients'
 import PatientProfile from './pages/PatientProfile'
+import CustomerDetails from './pages/CustomerDetails'
 import DentalClientSchedule from './pages/DentalClientSchedule'
 import DentalClientInventory from './pages/DentalClientInventory'
 import DentalClientSettings from './pages/DentalClientSettings'
@@ -96,6 +97,8 @@ function App() {
               <Route index element={<DentalClientStitchDashboard />} />
               <Route path="patients" element={<DentalClientPatients />} />
               <Route path="patients/:id" element={<PatientProfile />} />
+              <Route path="customers" element={<CustomerDetails />} />
+              <Route path="customers/:id" element={<CustomerDetails />} />
               <Route path="schedule" element={<DentalClientSchedule />} />
               <Route path="inventory" element={<DentalClientInventory />} />
               <Route path="settings" element={<DentalClientSettings />} />
