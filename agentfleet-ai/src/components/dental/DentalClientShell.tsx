@@ -64,7 +64,6 @@ export default function DentalClientShell() {
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#005db6] text-xl text-white">{logo}</div>
           <div className="hidden lg:block">
             <p className="text-lg font-bold leading-tight text-[#005db6]">{clinicName}</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#424752]">Dental workspace</p>
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-2">
