@@ -90,6 +90,15 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS dentist_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(160) NOT NULL,
+  content TEXT NOT NULL,
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID,
@@ -106,6 +115,7 @@ CREATE INDEX IF NOT EXISTS idx_patients_search_phone ON patients (phone);
 CREATE INDEX IF NOT EXISTS idx_appointments_date_status ON appointments (appointment_date, status);
 CREATE INDEX IF NOT EXISTS idx_appointments_patient ON appointments (patient_id, appointment_date DESC);
 CREATE INDEX IF NOT EXISTS idx_inventory_active_category ON inventory_items (is_active, category);
+CREATE INDEX IF NOT EXISTS idx_dentist_notes_updated ON dentist_notes (updated_at DESC);
 
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS TRIGGER AS $$
 BEGIN
@@ -120,3 +130,5 @@ DROP TRIGGER IF EXISTS appointments_updated_at ON appointments;
 CREATE TRIGGER appointments_updated_at BEFORE UPDATE ON appointments FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS inventory_updated_at ON inventory_items;
 CREATE TRIGGER inventory_updated_at BEFORE UPDATE ON inventory_items FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS dentist_notes_updated_at ON dentist_notes;
+CREATE TRIGGER dentist_notes_updated_at BEFORE UPDATE ON dentist_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();

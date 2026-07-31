@@ -18,6 +18,13 @@ router.get('/dashboard', PatientController.getDashboardData)
 // Create new booking (patient + appointment)
 router.post('/bookings', PatientController.createBooking)
 
+// Dentist notes
+router.get('/notes', PatientController.getDentistNotes)
+router.post('/notes', PatientController.createDentistNote)
+router.patch('/notes/:id', PatientController.updateDentistNote)
+router.put('/notes/:id', PatientController.updateDentistNote)
+router.delete('/notes/:id', PatientController.deleteDentistNote)
+
 // Patient routes
 router.get('/patients', PatientController.getPatients)
 router.get('/patients/:id', PatientController.getPatientById)
