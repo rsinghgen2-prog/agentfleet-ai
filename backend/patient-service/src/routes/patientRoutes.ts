@@ -55,6 +55,7 @@ router.post('/support/conversations/:id/messages', SupportController.sendMessage
 router.get('/patients', PatientController.getPatients)
 router.get('/patients/:id/profile', PatientController.getPatientProfile)
 router.post('/patients/:id/prescriptions', PatientController.createPrescription)
+router.patch('/patients/:id/prescriptions/:prescriptionId', PatientController.updatePrescription)
 router.post('/patients/:id/reports', PatientController.createReport)
 router.get('/patients/:id/reports/:reportId/download', PatientController.downloadReport)
 router.post('/patients/:id/lab-orders', PatientController.createLabOrder)

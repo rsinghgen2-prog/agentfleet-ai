@@ -162,6 +162,21 @@ export class PatientController {
     } catch (error) { return sendError(res, error, 'Failed to create prescription') }
   }
 
+  static async updatePrescription(req: TenantRequest, res: any) {
+    try {
+      const input = prescriptionInput.partial().parse(req.body); const patientId = uuidParam(req, 'id'); const prescriptionId = uuidParam(req, 'prescriptionId'); const s = schema(req); await ensurePatientProfileTables(s)
+      const medicationName = input.medicationName || input.medication || input.name
+      const fields: Array<[string, unknown]> = []
+      if (medicationName !== undefined) fields.push(['medication_name', medicationName])
+      for (const [key, column] of [['dosage', 'dosage'], ['frequency', 'frequency'], ['duration', 'duration'], ['instructions', 'instructions'], ['prescribedBy', 'prescribed_by'], ['startDate', 'start_date'], ['endDate', 'end_date']] as const) if (input[key] !== undefined) fields.push([column, input[key] || null])
+      if (!fields.length) return res.status(400).json({ success: false, message: 'No fields to update' })
+      const assignments = fields.map(([column], index) => `${column} = $${index + 1}`)
+      const result = await pool.query(`UPDATE ${s}.prescriptions SET ${assignments.join(', ')}, updated_at = NOW() WHERE id = $${fields.length + 1} AND patient_id = $${fields.length + 2} AND EXISTS (SELECT 1 FROM ${s}.patients WHERE id = $${fields.length + 2} AND is_active) RETURNING id, patient_id, medication_name, dosage, frequency, duration, instructions, prescribed_by, start_date, end_date, created_by, created_at, updated_at`, [...fields.map(([, value]) => value), prescriptionId, patientId])
+      if (!result.rowCount) return res.status(404).json({ success: false, message: 'Prescription not found' })
+      await audit(s, req, 'update', 'prescription', prescriptionId, result.rows[0]); return res.json({ success: true, data: result.rows[0] })
+    } catch (error) { return sendError(res, error, 'Failed to update prescription') }
+  }
+
   static async createReport(req: TenantRequest, res: any) {
     try {
       const input = reportInput.parse(req.body); const id = uuidParam(req, 'id'); const s = schema(req); await ensurePatientProfileTables(s)
