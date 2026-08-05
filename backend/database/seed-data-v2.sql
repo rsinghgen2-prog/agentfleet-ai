@@ -42,7 +42,7 @@ VALUES ('Dental Examination Kit','Diagnostic',24,10,'kits'),('Composite Resin A2
 ON CONFLICT DO NOTHING;
 
 INSERT INTO appointments (patient_id,appointment_date,appointment_time,duration,appointment_type,status,reason,notes,follow_up_required,follow_up_date)
-SELECT p.id, CURRENT_DATE, '08:00', 30, 'Checkup', 'confirmed', 'Regular checkup', 'Active patient', FALSE, NULL FROM patients p WHERE p.email='aarav@example.test'
+SELECT p.id, CURRENT_DATE, '08:00'::time, 30, 'Checkup', 'confirmed', 'Regular checkup', 'Active patient', FALSE, NULL FROM patients p WHERE p.email='aarav@example.test'
 UNION ALL SELECT p.id, CURRENT_DATE, '10:00', 45, 'Cleaning', 'scheduled', 'Preventive cleaning', 'Confirm SMS reminder', TRUE, CURRENT_DATE + 30 FROM patients p WHERE p.email='meera@example.test'
 UNION ALL SELECT p.id, CURRENT_DATE, '14:00', 30, 'Cavity Filling', 'in_progress', 'Filling review', 'Review previous notes', FALSE, NULL FROM patients p WHERE p.email='kabir@example.test'
 UNION ALL SELECT p.id, CURRENT_DATE, '16:00', 30, 'Consultation', 'scheduled', 'New patient assessment', 'Collect history', FALSE, NULL FROM patients p WHERE p.email='ananya@example.test'
@@ -74,5 +74,5 @@ VALUES ('Dental Examination Kit','Diagnostic',12,5,'kits'),('Nitrile Examination
 ON CONFLICT DO NOTHING;
 
 INSERT INTO appointments (patient_id,appointment_date,appointment_time,duration,appointment_type,status,reason,notes,follow_up_required,follow_up_date)
-SELECT p.id, CURRENT_DATE, '09:00', 30, 'Checkup', 'scheduled', 'Initial examination', 'ABC Dental Care test appointment', TRUE, CURRENT_DATE + 30 FROM patients p WHERE p.email='nisha@example.test'
+SELECT p.id, CURRENT_DATE, '09:00'::time, 30, 'Checkup', 'scheduled', 'Initial examination', 'ABC Dental Care test appointment', TRUE, CURRENT_DATE + 30 FROM patients p WHERE p.email='nisha@example.test'
 UNION ALL SELECT p.id, CURRENT_DATE + 1, '11:00', 45, 'Cleaning', 'scheduled', 'Preventive cleaning', 'ABC Dental Care follow-up', FALSE, NULL FROM patients p WHERE p.email='arjun@example.test';
