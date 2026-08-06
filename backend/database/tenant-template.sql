@@ -241,6 +241,25 @@ CREATE INDEX IF NOT EXISTS idx_support_conversations_owner ON support_conversati
 CREATE INDEX IF NOT EXISTS idx_support_messages_conversation ON support_messages (conversation_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_hospital_directory_owner ON hospital_directory (owner_user_id, is_active, relationship);
 CREATE INDEX IF NOT EXISTS idx_client_notifications_unread ON client_notifications (recipient_user_id, is_read, created_at DESC);
+-- Customer payments ledger. customer_id references the patient (customer) for
+-- traceability; payment_number is the human-readable payment id.
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  payment_number VARCHAR(80) NOT NULL UNIQUE,
+  amount NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
+  currency VARCHAR(3) NOT NULL DEFAULT 'INR',
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed', 'refunded')),
+  method VARCHAR(20) CHECK (method IN ('cash', 'cheque', 'online', 'bank_transfer', 'card', 'upi')),
+  description TEXT NOT NULL DEFAULT '',
+  paid_at TIMESTAMPTZ,
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_customer ON payments (customer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_patient ON prescriptions (patient_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_patient_reports_patient ON patient_reports (patient_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_lab_orders_patient ON lab_orders (patient_id, created_at DESC);
@@ -273,3 +292,5 @@ DROP TRIGGER IF EXISTS lab_orders_updated_at ON lab_orders;
 CREATE TRIGGER lab_orders_updated_at BEFORE UPDATE ON lab_orders FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS lab_order_dispatches_updated_at ON lab_order_dispatches;
 CREATE TRIGGER lab_order_dispatches_updated_at BEFORE UPDATE ON lab_order_dispatches FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS payments_updated_at ON payments;
+CREATE TRIGGER payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION set_updated_at();

@@ -22,6 +22,14 @@ const inventoryOrderInput = z.object({ vendorId: z.string().uuid().optional().nu
 const inventoryOrderUpdateInput = inventoryOrderInput.partial()
 const inventoryOrderEventInput = z.object({ eventType: z.string().trim().min(1).max(80), status: inventoryOrderStatus.optional(), description: z.string().trim().max(2000).optional().default(''), location: z.string().trim().max(255).optional().default(''), occurredAt: z.string().datetime().optional() })
 const inventoryCommunicationInput = z.object({ channel: z.enum(['email', 'sms']), recipientType: z.enum(['vendor', 'patient', 'client']).default('vendor'), recipient: z.string().trim().max(255).optional(), subject: z.string().trim().max(255).optional().default('Inventory purchase order'), body: z.string().trim().min(1).max(10000), copyToPatient: z.boolean().optional().default(false), patientId: z.string().uuid().optional().nullable() })
+const paymentStatus = z.enum(['pending', 'paid', 'failed', 'refunded'])
+const paymentMethod = z.enum(['cash', 'cheque', 'online', 'bank_transfer', 'card', 'upi'])
+const paymentCreateInput = z.object({ customerId: z.string().uuid(), paymentNumber: z.string().trim().max(80).optional(), amount: z.coerce.number().finite().min(0), currency: z.string().trim().length(3).optional().default('INR'), status: paymentStatus.default('pending'), method: paymentMethod.optional().nullable(), description: z.string().trim().max(4000).optional().default('') })
+const paymentUpdateInput = z.object({ amount: z.coerce.number().finite().min(0).optional(), currency: z.string().trim().length(3).optional(), status: paymentStatus.optional(), method: paymentMethod.optional().nullable(), description: z.string().trim().max(4000).optional() })
+
+// Client admins own the clinic's financials; only they may see reports/summaries.
+const ADMIN_ROLES = new Set(['admin', 'super_admin', 'owner', 'client_admin'])
+function isClientAdmin(req: TenantRequest) { return req.user?.isSuperAdmin === true || ADMIN_ROLES.has(req.user?.role || '') }
 
 function ensureFeatureTables(s: string) {
   const existing = featureTableInitializers.get(s)
@@ -34,8 +42,13 @@ function ensureFeatureTables(s: string) {
     await pool.query(`CREATE TABLE IF NOT EXISTS ${s}.inventory_order_items (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_id UUID NOT NULL REFERENCES ${s}.inventory_orders(id) ON DELETE CASCADE, inventory_item_id UUID REFERENCES ${s}.inventory_items(id) ON DELETE SET NULL, item_name VARCHAR(255) NOT NULL, quantity INTEGER NOT NULL CHECK (quantity > 0), unit VARCHAR(50) NOT NULL DEFAULT 'units', unit_price NUMERIC(12,2) NOT NULL DEFAULT 0, total_price NUMERIC(12,2) NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
     await pool.query(`CREATE TABLE IF NOT EXISTS ${s}.inventory_order_events (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_id UUID NOT NULL REFERENCES ${s}.inventory_orders(id) ON DELETE CASCADE, event_type VARCHAR(80) NOT NULL, status VARCHAR(30), description TEXT NOT NULL DEFAULT '', location VARCHAR(255) NOT NULL DEFAULT '', occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), created_by UUID REFERENCES ${s}.users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
     await pool.query(`CREATE TABLE IF NOT EXISTS ${s}.inventory_communications (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_id UUID NOT NULL REFERENCES ${s}.inventory_orders(id) ON DELETE CASCADE, channel VARCHAR(10) NOT NULL CHECK (channel IN ('email', 'sms')), recipient_type VARCHAR(20) NOT NULL CHECK (recipient_type IN ('vendor', 'patient', 'client')), recipient VARCHAR(255) NOT NULL, subject VARCHAR(255) NOT NULL DEFAULT '', body TEXT NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'queued', sent_at TIMESTAMPTZ, created_by UUID REFERENCES ${s}.users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS ${s}.payments (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), customer_id UUID NOT NULL REFERENCES ${s}.patients(id) ON DELETE CASCADE, payment_number VARCHAR(80) NOT NULL UNIQUE, amount NUMERIC(12,2) NOT NULL CHECK (amount >= 0), currency VARCHAR(3) NOT NULL DEFAULT 'INR', status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed', 'refunded')), method VARCHAR(20) CHECK (method IN ('cash', 'cheque', 'online', 'bank_transfer', 'card', 'upi')), description TEXT NOT NULL DEFAULT '', paid_at TIMESTAMPTZ, created_by UUID REFERENCES ${s}.users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_payments_customer ON ${s}.payments (customer_id, created_at DESC)`)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_payments_status ON ${s}.payments (status, created_at DESC)`)
     await pool.query(`DROP TRIGGER IF EXISTS hospital_directory_updated_at ON ${s}.hospital_directory`)
     await pool.query(`CREATE TRIGGER hospital_directory_updated_at BEFORE UPDATE ON ${s}.hospital_directory FOR EACH ROW EXECUTE FUNCTION ${s}.set_updated_at()`)
+    await pool.query(`DROP TRIGGER IF EXISTS payments_updated_at ON ${s}.payments`)
+    await pool.query(`CREATE TRIGGER payments_updated_at BEFORE UPDATE ON ${s}.payments FOR EACH ROW EXECUTE FUNCTION ${s}.set_updated_at()`)
   })()
   featureTableInitializers.set(s, initializer)
   initializer.catch(() => featureTableInitializers.delete(s))
@@ -296,6 +309,68 @@ router.post('/inventory/orders/:id/reorder', async (req: TenantRequest, res, nex
     const source = await pool.query(`SELECT * FROM ${s}.inventory_orders WHERE id=$1 AND status <> 'draft'`, [id.data]); if (!source.rowCount) return res.status(404).json({ success: false, message: 'Historical inventory order not found' }); const items = await pool.query(`SELECT inventory_item_id, item_name, quantity, unit, unit_price FROM ${s}.inventory_order_items WHERE order_id=$1 ORDER BY created_at`, [id.data]); const order = source.rows[0]; const orderNumber = `PO-REORDER-${String(Date.now()).slice(-10)}`
     const newId = await withTransaction(async (client) => { const created = await client.query(`INSERT INTO ${s}.inventory_orders (vendor_id, order_number, patient_id, status, payment_status, subtotal, tax_amount, total_amount, notes, expected_delivery_date, created_by) VALUES ($1,$2,$3,'draft','pending',$4,$5,$6,$7,$8,$9) RETURNING id`, [order.vendor_id, orderNumber, order.patient_id, order.subtotal, order.tax_amount, order.total_amount, `Reordered from ${order.order_number}. ${order.notes || ''}`.trim(), order.expected_delivery_date, req.user?.userId || null]); for (const item of items.rows) await client.query(`INSERT INTO ${s}.inventory_order_items (order_id, inventory_item_id, item_name, quantity, unit, unit_price, total_price) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [created.rows[0].id, item.inventory_item_id, item.item_name, item.quantity, item.unit, item.unit_price, Number(item.quantity) * Number(item.unit_price)]); return created.rows[0].id as string })
     const result = await pool.query(inventoryOrderSelect(s, 'o.id=$1'), [newId]); return res.status(201).json({ success: true, data: result.rows[0] })
+  } catch (error) { next(error) }
+})
+
+// ---- Payments (customer billing ledger) ----
+function paymentSelect(s: string, filter = 'TRUE') {
+  return `SELECT pay.*, p.first_name, p.last_name, p.email, p.phone
+    FROM ${s}.payments pay JOIN ${s}.patients p ON p.id = pay.customer_id WHERE ${filter}`
+}
+
+// List payments. Optional customerId, status, and free-text search on payment number / customer.
+router.get('/payments', async (req: TenantRequest, res, next) => {
+  try {
+    const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s); const params: unknown[] = []; const filters = ['TRUE']
+    if (typeof req.query.customerId === 'string') { const parsed = z.string().uuid().safeParse(req.query.customerId); if (!parsed.success) return res.status(400).json({ success: false, message: 'Invalid customer id' }); params.push(parsed.data); filters.push(`pay.customer_id = $${params.length}`) }
+    if (typeof req.query.status === 'string') { const parsed = paymentStatus.safeParse(req.query.status); if (!parsed.success) return res.status(400).json({ success: false, message: 'Invalid payment status' }); params.push(parsed.data); filters.push(`pay.status = $${params.length}`) }
+    if (typeof req.query.search === 'string' && req.query.search.trim()) { params.push(`%${req.query.search.trim()}%`); filters.push(`(pay.payment_number ILIKE $${params.length} OR (p.first_name || ' ' || p.last_name) ILIKE $${params.length})`) }
+    const result = await pool.query(`${paymentSelect(s, filters.join(' AND '))} ORDER BY pay.created_at DESC`, params)
+    return res.json({ success: true, data: result.rows })
+  } catch (error) { next(error) }
+})
+
+// Create a payment for a customer (patient). payment_number is generated when omitted.
+router.post('/payments', async (req: TenantRequest, res, next) => {
+  try {
+    const input = paymentCreateInput.parse(req.body); const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s)
+    const paymentNumber = input.paymentNumber || `PAY-${new Date().getFullYear()}-${String(Date.now()).slice(-8)}`
+    const inserted = await pool.query(`INSERT INTO ${s}.payments (customer_id, payment_number, amount, currency, status, method, description, paid_at, created_by) SELECT $1,$2,$3,$4,$5,$6,$7,CASE WHEN $5 = 'paid' THEN NOW() ELSE NULL END,$8 WHERE EXISTS (SELECT 1 FROM ${s}.patients WHERE id = $1) RETURNING id`, [input.customerId, paymentNumber, input.amount, input.currency, input.status, input.method || null, input.description, req.user?.userId || null])
+    if (!inserted.rowCount) return res.status(404).json({ success: false, message: 'Customer not found' })
+    const result = await pool.query(paymentSelect(s, 'pay.id = $1'), [inserted.rows[0].id]); return res.status(201).json({ success: true, data: result.rows[0] })
+  } catch (error) { if (error instanceof z.ZodError) return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues }); next(error) }
+})
+
+// Update a payment (status/method/amount/description). Sets paid_at when status becomes paid.
+router.patch('/payments/:id', async (req: TenantRequest, res, next) => {
+  try {
+    const id = z.string().uuid().safeParse(req.params.id); if (!id.success) return res.status(400).json({ success: false, message: 'Invalid payment id' }); const input = paymentUpdateInput.parse(req.body); const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s)
+    const fields: Array<[string, unknown]> = []; const add = (name: string, value: unknown) => { if (value !== undefined) fields.push([name, value]) }
+    add('amount', input.amount); add('currency', input.currency); add('status', input.status); add('method', input.method === undefined ? undefined : input.method || null); add('description', input.description)
+    if (!fields.length) return res.status(400).json({ success: false, message: 'No fields to update' })
+    const assignments = fields.map(([name], index) => `${name}=$${index + 1}`); if (input.status === 'paid') assignments.push(`paid_at=COALESCE(paid_at,NOW())`)
+    const updated = await pool.query(`UPDATE ${s}.payments SET ${assignments.join(', ')}, updated_at=NOW() WHERE id=$${fields.length + 1} RETURNING id`, [...fields.map(([, value]) => value), id.data])
+    if (!updated.rowCount) return res.status(404).json({ success: false, message: 'Payment not found' })
+    const result = await pool.query(paymentSelect(s, 'pay.id = $1'), [id.data]); return res.json({ success: true, data: result.rows[0] })
+  } catch (error) { if (error instanceof z.ZodError) return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues }); next(error) }
+})
+
+// Admin-only financial summary: totals by status plus overall collected/outstanding.
+router.get('/payments/summary', async (req: TenantRequest, res, next) => {
+  try {
+    if (!isClientAdmin(req)) return res.status(403).json({ success: false, message: 'Only client admins can view payment reports' })
+    const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s)
+    const result = await pool.query(`SELECT
+      COUNT(*)::int AS total_payments,
+      COALESCE(SUM(amount), 0)::numeric AS total_amount,
+      COALESCE(SUM(amount) FILTER (WHERE status = 'paid'), 0)::numeric AS collected_amount,
+      COALESCE(SUM(amount) FILTER (WHERE status = 'pending'), 0)::numeric AS pending_amount,
+      COALESCE(SUM(amount) FILTER (WHERE status = 'refunded'), 0)::numeric AS refunded_amount,
+      COUNT(*) FILTER (WHERE status = 'paid')::int AS paid_count,
+      COUNT(*) FILTER (WHERE status = 'pending')::int AS pending_count,
+      COUNT(DISTINCT customer_id)::int AS customers_count
+      FROM ${s}.payments`)
+    return res.json({ success: true, data: result.rows[0] })
   } catch (error) { next(error) }
 })
 

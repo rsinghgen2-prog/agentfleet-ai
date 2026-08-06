@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState, type CSSProperties } from 'react'
-import { CalendarDays, CircleHelp, ClipboardList, Grid2X2, LogOut, Menu, Moon, Package, Search, Settings, Sun, Users } from 'lucide-react'
+import { CalendarDays, CircleHelp, ClipboardList, Grid2X2, LogOut, Menu, Moon, Package, Search, Settings, Sun, Users, WalletCards } from 'lucide-react'
 import { useDentalDashboardData } from '../../hooks/useDentalDashboardData'
 import { useTheme } from '../../context/ThemeContext'
 import DentalSupportChat from './DentalSupportChat'
@@ -12,6 +12,7 @@ const navItems = [
   { label: 'Customer Details', to: '/dental-client/customers', icon: ClipboardList },
   { label: 'Schedule', to: '/dental-client/schedule', icon: CalendarDays },
   { label: 'Inventory', to: '/dental-client/inventory', icon: Package },
+  { label: 'Payments', to: '/dental-client/payments', icon: WalletCards },
   { label: 'Settings', to: '/dental-client/settings', icon: Settings },
 ]
 

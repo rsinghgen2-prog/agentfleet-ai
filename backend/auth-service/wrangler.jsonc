@@ -1,0 +1,50 @@
+{
+  // Cloudflare Worker + Container wrapper for the auth-service Express app.
+  // Deploy with: npx wrangler deploy  (Docker must be running locally)
+  "name": "agentfleet-auth-service",
+  "main": "worker.ts",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Build the existing Dockerfile into a container image and run it behind a Durable Object.
+  "containers": [
+    {
+      "class_name": "AuthContainer",
+      "image": "./Dockerfile",
+      "max_instances": 3
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AUTH_CONTAINER",
+        "class_name": "AuthContainer"
+      }
+    ]
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AuthContainer"]
+    }
+  ],
+
+  // Hyperdrive pools + caches connections to the Neon Postgres database.
+  // Replace <YOUR_HYPERDRIVE_ID> with the id printed by `wrangler hyperdrive create`.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "<YOUR_HYPERDRIVE_ID>"
+    }
+  ],
+
+  // Non-secret vars. Set CORS_ORIGIN to your deployed frontend origin.
+  // Secrets (JWT_SECRET, JWT_REFRESH_SECRET) are provided via `wrangler secret put`.
+  "vars": {
+    "NODE_ENV": "production",
+    "PORT": "3001",
+    "CORS_ORIGIN": "https://agentfleet-ai.pages.dev"
+  }
+}

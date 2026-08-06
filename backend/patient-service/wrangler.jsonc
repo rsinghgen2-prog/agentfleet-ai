@@ -1,0 +1,50 @@
+{
+  // Cloudflare Worker + Container wrapper for the patient-service Express app.
+  // Deploy with: npx wrangler deploy  (Docker must be running locally)
+  "name": "agentfleet-patient-service",
+  "main": "worker.ts",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Build the existing Dockerfile into a container image and run it behind a Durable Object.
+  "containers": [
+    {
+      "class_name": "PatientContainer",
+      "image": "./Dockerfile",
+      "max_instances": 3
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PATIENT_CONTAINER",
+        "class_name": "PatientContainer"
+      }
+    ]
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["PatientContainer"]
+    }
+  ],
+
+  // Hyperdrive pools + caches connections to the Neon Postgres database.
+  // Replace <YOUR_HYPERDRIVE_ID> with the id printed by `wrangler hyperdrive create`.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "<YOUR_HYPERDRIVE_ID>"
+    }
+  ],
+
+  // Non-secret vars. Set CORS_ORIGIN to your deployed frontend origin.
+  // Secret (JWT_SECRET) is provided via `wrangler secret put` and MUST match auth-service.
+  "vars": {
+    "NODE_ENV": "production",
+    "PORT": "3010",
+    "CORS_ORIGIN": "https://agentfleet-ai.pages.dev"
+  }
+}

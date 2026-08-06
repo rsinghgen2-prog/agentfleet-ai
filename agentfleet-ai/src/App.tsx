@@ -20,6 +20,7 @@ import PatientProfile from './pages/PatientProfile'
 import CustomerDetails from './pages/CustomerDetails'
 import DentalClientSchedule from './pages/DentalClientSchedule'
 import DentalClientInventory from './pages/DentalClientInventory'
+import DentalClientPayments from './pages/DentalClientPayments'
 import DentalClientSettings from './pages/DentalClientSettings'
 import DentalClientShell from './components/dental/DentalClientShell'
 import Settings from './pages/Settings'
@@ -101,6 +102,7 @@ function App() {
               <Route path="customers/:id" element={<CustomerDetails />} />
               <Route path="schedule" element={<DentalClientSchedule />} />
               <Route path="inventory" element={<DentalClientInventory />} />
+              <Route path="payments" element={<DentalClientPayments />} />
               <Route path="settings" element={<DentalClientSettings />} />
             </Route>
             <Route path="/settings" element={

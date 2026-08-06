@@ -38,6 +38,12 @@ export interface PrescriptionUpdateInput extends PrescriptionInput { prescriptio
 export interface PatientUpdateInput { firstName?: string; lastName?: string; email?: string | null; phone?: string | null; dateOfBirth?: string | null; gender?: string | null; notes?: string | null }
 export interface MedicalReportInput { patientId: string; fileName: string; mimeType: string; fileSize: number; dataBase64: string; description?: string }
 export interface LabOrderInput { patientId: string; orderNumber?: string; tests: string; teethCreationService: string; labName: string; labEmail: string; labPhone: string; instructions: string; copyToPatient: boolean; copyToClinic: boolean }
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
+export type PaymentMethod = 'cash' | 'cheque' | 'online' | 'bank_transfer' | 'card' | 'upi'
+export interface Payment { id: string; customer_id: string; payment_number: string; amount: number; currency: string; status: PaymentStatus; method?: PaymentMethod | null; description: string; paid_at?: string | null; created_by?: string | null; created_at: string; updated_at: string; first_name: string; last_name: string; email?: string | null; phone?: string | null }
+export interface PaymentInput { customerId: string; paymentNumber?: string; amount: number; currency?: string; status?: PaymentStatus; method?: PaymentMethod | null; description?: string }
+export interface PaymentUpdateInput { amount?: number; currency?: string; status?: PaymentStatus; method?: PaymentMethod | null; description?: string }
+export interface PaymentSummary { total_payments: number; total_amount: number; collected_amount: number; pending_amount: number; refunded_amount: number; paid_count: number; pending_count: number; customers_count: number }
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show'
 export interface AppointmentUpdateInput { patientId?: string; appointmentDate?: string; appointmentTime?: string; duration?: number; appointmentType?: string; status?: AppointmentStatus; reason?: string | null; notes?: string | null; followUpRequired?: boolean; followUpDate?: string | null }
 
@@ -64,6 +70,27 @@ function makeLabOrderPdf(input: { orderNumber: string; patientId: string; tests:
   return { base64: btoa(pdf), size: new TextEncoder().encode(pdf).length }
 }
 
+function makePaymentReportPdf(input: { clinicName: string; generatedAt: string; summary: PaymentSummary; payments: Payment[] }) {
+  const safe = (value: string) => value.replace(/[^\x20-\x7E]/g, '?').replace(/[()\\]/g, (character) => `\\${character}`)
+  const currency = input.payments[0]?.currency || 'INR'
+  const amount = (value: number) => `${currency} ${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const lines = [
+    `Payment report - ${input.clinicName}`,
+    `Generated: ${input.generatedAt}`,
+    `Total payments: ${input.summary.total_payments}   Customers: ${input.summary.customers_count}`,
+    `Collected: ${amount(input.summary.collected_amount)}   Pending: ${amount(input.summary.pending_amount)}   Refunded: ${amount(input.summary.refunded_amount)}`,
+    ``,
+    `Payment ID              Customer ID           Customer            Status     Amount`,
+    ...input.payments.slice(0, 30).map((payment) => `${payment.payment_number.padEnd(22).slice(0, 22)}  ${payment.customer_id.slice(0, 18).padEnd(18)}  ${`${payment.first_name} ${payment.last_name}`.slice(0, 18).padEnd(18)}  ${payment.status.padEnd(9)}  ${amount(payment.amount)}`),
+  ]
+  const stream = [`BT`, `/F1 14 Tf`, `40 770 Td`, `(${safe(lines[0])}) Tj`, `/F1 8 Tf`, ...lines.slice(1).map((line) => `0 -18 Td (${safe(line)}) Tj`), `ET`, ''].join('\n')
+  const objects = [`<< /Type /Catalog /Pages 2 0 R >>`, `<< /Type /Pages /Kids [3 0 R] /Count 1 >>`, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>`, `<< /Length ${stream.length} >>\nstream\n${stream}endstream`, `<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>`]
+  let pdf = '%PDF-1.4\n'; const offsets = [0]
+  objects.forEach((object, index) => { offsets.push(pdf.length); pdf += `${index + 1} 0 obj\n${object}\nendobj\n` })
+  const xref = pdf.length; pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  return { base64: btoa(pdf), size: new TextEncoder().encode(pdf).length }
+}
+
 const localDateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 const today = localDateKey(new Date())
 const dateIn = (days: number) => { const date = new Date(); date.setDate(date.getDate() + days); return localDateKey(date) }
@@ -76,6 +103,7 @@ const DEMO_INVENTORY_ORDERS_KEY = 'agentfleet.demo.inventoryOrders'
 const DEMO_SUPPORT_CHAT_KEY = 'agentfleet.demo.supportChat'
 const DEMO_CLIENT_ALERTS_KEY = 'agentfleet.demo.clientAlerts'
 const DEMO_PATIENT_PROFILES_KEY = 'agentfleet.demo.patientProfiles'
+const DEMO_PAYMENTS_KEY = 'agentfleet.demo.payments'
 const mockPatients: Patient[] = [
   ['Aarav', 'Sharma', 'Active orthodontic treatment'], ['Meera', 'Cooper', 'Upcoming follow-up'], ['Kabir', 'Alexander', 'Needs filling review'], ['Ananya', 'Wilson', 'New patient'], ['Rohan', 'Fox', 'Requires treatment plan'],
   ['Isha', 'Howard', 'Preventive care'], ['Vihaan', 'Williamson', 'Implant review'], ['Tara', 'Simmons', 'Follow-up needed'], ['Dev', 'Patel', 'Overdue cleaning'], ['Zoya', 'Khan', 'Minor patient; guardian consent required'],
@@ -128,6 +156,8 @@ function writeDemoCollection<T>(key: string, items: T[]) {
 }
 
 const getDemoPatients = () => readDemoCollection<Patient>(DEMO_PATIENTS_KEY, mockPatients)
+const getDemoPayments = (): Payment[] => readDemoCollection<Payment>(DEMO_PAYMENTS_KEY, [])
+const demoPaymentWithCustomer = (payment: Payment): Payment => { const customer = getDemoPatients().find((patient) => patient.id === payment.customer_id); return { ...payment, first_name: customer?.first_name || payment.first_name || 'Unknown', last_name: customer?.last_name || payment.last_name || 'Customer', email: customer?.email ?? payment.email ?? null, phone: customer?.phone ?? payment.phone ?? null } }
 const getDemoAppointments = () => readDemoCollection<Appointment>(DEMO_APPOINTMENTS_KEY, mockAppointments)
 const getDemoAlerts = () => readDemoCollection<NotificationAlert>(DEMO_CLIENT_ALERTS_KEY, mockClientAlerts)
 const getDemoPatientProfiles = () => {
@@ -252,6 +282,28 @@ export class DashboardService {
   static async getSupportChat(): Promise<SupportChat | null> { try { return await this.request<SupportChat | null>('/api/v1/patients/support/chat') } catch (error) { if (!DEMO_MODE) throw error; return readDemoCollection<SupportChat>(DEMO_SUPPORT_CHAT_KEY, [])[0] || null } }
   static async createSupportConversation(subject = 'Hospital support'): Promise<SupportChat> { try { return await this.request<SupportChat>('/api/v1/patients/support/conversations', { method: 'POST', body: JSON.stringify({ subject }) }) } catch (error) { if (!DEMO_MODE) throw error; const now = new Date().toISOString(); const chat: SupportChat = { conversation: { id: `demo-support-${Date.now()}`, subject, status: 'open', created_by: 'demo-user', created_at: now, updated_at: now }, messages: [] }; writeDemoCollection(DEMO_SUPPORT_CHAT_KEY, [chat]); return chat } }
   static async sendSupportMessage(conversationId: string, body: string): Promise<SupportMessage> { try { return await this.request<SupportMessage>(`/api/v1/patients/support/conversations/${encodeURIComponent(conversationId)}/messages`, { method: 'POST', body: JSON.stringify({ body }) }) } catch (error) { if (!DEMO_MODE) throw error; const chats = readDemoCollection<SupportChat>(DEMO_SUPPORT_CHAT_KEY, []); const chat = chats.find((item) => item.conversation?.id === conversationId); if (!chat || !chat.conversation) throw new Error('Support conversation not found'); const message: SupportMessage = { id: `demo-support-message-${Date.now()}`, conversation_id: conversationId, sender_id: 'demo-user', sender_name: 'You', sender_role: 'client', body, created_at: new Date().toISOString() }; chat.messages = [...chat.messages, message]; chat.conversation.updated_at = message.created_at; writeDemoCollection(DEMO_SUPPORT_CHAT_KEY, chats); return message } }
+
+  static async getPayments(options: { search?: string; status?: PaymentStatus; customerId?: string } = {}): Promise<Payment[]> {
+    try { const query = new URLSearchParams(); if (options.search) query.set('search', options.search); if (options.status) query.set('status', options.status); if (options.customerId) query.set('customerId', options.customerId); return await this.request<Payment[]>(`/api/v1/patients/payments${query.toString() ? `?${query}` : ''}`) }
+    catch (error) { if (!DEMO_MODE) throw error; const needle = (options.search || '').trim().toLowerCase(); return getDemoPayments().map(demoPaymentWithCustomer).filter((payment) => (!options.status || payment.status === options.status) && (!options.customerId || payment.customer_id === options.customerId) && (!needle || `${payment.payment_number} ${payment.first_name} ${payment.last_name}`.toLowerCase().includes(needle))).sort((a, b) => b.created_at.localeCompare(a.created_at)) }
+  }
+  static async createPayment(input: PaymentInput): Promise<Payment> {
+    try { return await this.request<Payment>('/api/v1/patients/payments', { method: 'POST', body: JSON.stringify(input) }) }
+    catch (error) { if (!DEMO_MODE) throw error; const customer = getDemoPatients().find((patient) => patient.id === input.customerId); if (!customer) throw new Error('Customer not found'); const now = new Date().toISOString(); const status = input.status || 'pending'; const payment: Payment = { id: `demo-payment-${Date.now()}`, customer_id: input.customerId, payment_number: input.paymentNumber || `PAY-${new Date().getFullYear()}-${String(Date.now()).slice(-8)}`, amount: input.amount, currency: input.currency || 'INR', status, method: input.method || null, description: input.description || '', paid_at: status === 'paid' ? now : null, created_at: now, updated_at: now, first_name: customer.first_name, last_name: customer.last_name, email: customer.email ?? null, phone: customer.phone ?? null }; writeDemoCollection(DEMO_PAYMENTS_KEY, [payment, ...getDemoPayments()]); return payment }
+  }
+  static async updatePayment(id: string, changes: PaymentUpdateInput): Promise<Payment> {
+    try { return await this.request<Payment>(`/api/v1/patients/payments/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(changes) }) }
+    catch (error) { if (!DEMO_MODE) throw error; const payments = getDemoPayments(); const existing = payments.find((payment) => payment.id === id); if (!existing) throw new Error('Payment not found'); const now = new Date().toISOString(); const status = changes.status ?? existing.status; const updated: Payment = { ...existing, amount: changes.amount ?? existing.amount, currency: changes.currency ?? existing.currency, status, method: changes.method === undefined ? existing.method : changes.method, description: changes.description ?? existing.description, paid_at: status === 'paid' ? existing.paid_at || now : existing.paid_at, updated_at: now }; writeDemoCollection(DEMO_PAYMENTS_KEY, payments.map((payment) => payment.id === id ? updated : payment)); return demoPaymentWithCustomer(updated) }
+  }
+  static async getPaymentSummary(): Promise<PaymentSummary> {
+    try { return await this.request<PaymentSummary>('/api/v1/patients/payments/summary') }
+    catch (error) { if (!DEMO_MODE) throw error; const payments = getDemoPayments(); const sum = (predicate: (payment: Payment) => boolean) => payments.filter(predicate).reduce((total, payment) => total + Number(payment.amount || 0), 0); return { total_payments: payments.length, total_amount: sum(() => true), collected_amount: sum((payment) => payment.status === 'paid'), pending_amount: sum((payment) => payment.status === 'pending'), refunded_amount: sum((payment) => payment.status === 'refunded'), paid_count: payments.filter((payment) => payment.status === 'paid').length, pending_count: payments.filter((payment) => payment.status === 'pending').length, customers_count: new Set(payments.map((payment) => payment.customer_id)).size } }
+  }
+  static async downloadPaymentReport(clinicName: string): Promise<void> {
+    const [summary, payments] = await Promise.all([this.getPaymentSummary(), this.getPayments()])
+    const pdf = makePaymentReportPdf({ clinicName, generatedAt: new Date().toLocaleString('en-IN'), summary, payments })
+    const binary = atob(pdf.base64); const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0)); const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); const link = document.createElement('a'); link.href = url; link.download = `payment-report-${localDateKey(new Date())}.pdf`; link.click(); URL.revokeObjectURL(url)
+  }
 
   private static async requestBody<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = localStorage.getItem('accessToken')
