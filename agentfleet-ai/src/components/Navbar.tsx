@@ -106,6 +106,13 @@ const Navbar = () => {
                 </a>
               )
             })}
+            <a
+              href="/reviews"
+              className="transition-colors relative group text-gray-300 hover:text-white"
+            >
+              Reviews
+              <span className="absolute bottom-0 left-0 h-0.5 bg-gradient-primary transition-all duration-300 w-0 group-hover:w-full" />
+            </a>
             <LanguageSelector />
 
             {/* Login/Logout Button */}
@@ -182,6 +189,13 @@ const Navbar = () => {
                   </a>
                 )
               })}
+              <a
+                href="/reviews"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block py-3 transition-colors text-gray-300 hover:text-white"
+              >
+                Reviews
+              </a>
               <button
                 onClick={handleBookDemo}
                 className="w-full mt-4 px-6 py-2 bg-gradient-primary rounded-lg font-semibold"
