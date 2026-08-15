@@ -8,7 +8,6 @@ import BookDemo from './pages/BookDemo'
 import MessageAutomation from './pages/MessageAutomation'
 import Register from './pages/Register'
 import Login from './pages/Login'
-import Reviews from './pages/Reviews'
 import Payment from './pages/Payment'
 import Dashboard from './pages/Dashboard'
 import EnhancedDashboard from './pages/EnhancedDashboard'
@@ -63,7 +62,6 @@ function App() {
             <Route path="/book-demo" element={<BookDemo />} />
             <Route path="/register" element={<Register />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/reviews" element={<Reviews />} />
 
             {/* Protected Routes - Require Login */}
             <Route path="/dashboard" element={
