@@ -65,7 +65,7 @@ body {
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  background-image: linear-gradient(90deg, #0f766e, #22d3ee, #38bdf8);
+  background-image: linear-gradient(90deg, #818cf8, #a855f7, #22d3ee);
 }
 
 /* The marketing site is designed on a dark canvas; text-white / text-gray-300
