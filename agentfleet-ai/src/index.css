@@ -1,6 +1,17 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
+/* Tailwind v4 reads design tokens from @theme (not tailwind.config.js). Register
+   the existing brand colors so utilities like text-primary, text-accent, and
+   bg-gradient-primary resolve — otherwise icons/buttons render with no color. */
+@theme {
+  --color-primary: #4F46E5;
+  --color-secondary: #8B5CF6;
+  --color-accent: #06B6D4;
+  --color-background: #0A0F1C;
+  --color-card: rgba(255, 255, 255, 0.05);
+}
+
 :root {
   color-scheme: light;
   --body-bg: #f4f8fb;
@@ -55,6 +66,10 @@ body {
   -webkit-background-clip: text;
   color: transparent;
   background-image: linear-gradient(90deg, #0f766e, #22d3ee, #38bdf8);
+}
+
+.bg-gradient-primary {
+  background-image: linear-gradient(135deg, #4F46E5 0%, #8B5CF6 100%);
 }
 
 .app-shell {
