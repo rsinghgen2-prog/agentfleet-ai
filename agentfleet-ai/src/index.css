@@ -1,6 +1,17 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
+/* Tailwind v4 reads design tokens from @theme (not tailwind.config.js). These
+   register the brand color tokens the marketing UI relies on (text-primary,
+   bg-accent, bg-gradient-primary, via-background, etc.). */
+@theme {
+  --color-primary: #4F46E5;
+  --color-secondary: #8B5CF6;
+  --color-accent: #06B6D4;
+  --color-background: #0A0F1C;
+  --color-card: rgba(255, 255, 255, 0.05);
+}
+
 :root {
   color-scheme: light;
   --body-bg: #f4f8fb;
@@ -54,7 +65,21 @@ body {
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  background-image: linear-gradient(90deg, #0f766e, #22d3ee, #38bdf8);
+  background-image: linear-gradient(90deg, #818cf8, #a855f7, #22d3ee);
+}
+
+/* The marketing site is designed on a dark canvas; text-white / text-gray-300
+   depend on it. Scope a dark surface + gradient utility to the public shell. */
+.marketing-shell {
+  background:
+    radial-gradient(circle at 15% 15%, rgba(79, 70, 229, 0.16), transparent 45%),
+    radial-gradient(circle at 85% 20%, rgba(139, 92, 246, 0.14), transparent 45%),
+    linear-gradient(180deg, #0A0F1C 0%, #0b1226 60%, #0A0F1C 100%);
+  color: #e2e8f0;
+}
+
+.bg-gradient-primary {
+  background-image: linear-gradient(135deg, #4F46E5 0%, #8B5CF6 100%);
 }
 
 .app-shell {

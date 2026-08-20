@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Menu, X, Bot, User, LogOut } from 'lucide-react'
+import { Menu, X, Bot, User, LogOut, ChevronDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import LanguageSelector from './LanguageSelector'
+import { industries } from '../data/industries'
 
 const Navbar = () => {
   const navigate = useNavigate()
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isIndustriesOpen, setIsIndustriesOpen] = useState(false)
+  const [isMobileIndustriesOpen, setIsMobileIndustriesOpen] = useState(false)
   const [activeSection, setActiveSection] = useState('')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentUser, setCurrentUser] = useState('')
@@ -48,11 +51,18 @@ const Navbar = () => {
 
   const navLinks = [
     { name: 'Solutions', href: '#solutions' },
-    { name: 'Industries', href: '#industries' },
     { name: 'Features', href: '#features' },
     { name: 'Pricing', href: '#pricing' },
     { name: 'How It Works', href: '#how-it-works' },
   ]
+
+  const goToIndustry = (slug: string) => {
+    setIsIndustriesOpen(false)
+    setIsMobileIndustriesOpen(false)
+    setIsMobileMenuOpen(false)
+    window.location.hash = `#industry-${slug}`
+    document.getElementById('industry-detail')?.scrollIntoView({ behavior: 'smooth' })
+  }
 
   const handleBookDemo = () => {
     window.location.href = '/book-demo'
@@ -106,6 +116,52 @@ const Navbar = () => {
                 </a>
               )
             })}
+
+            {/* Industries Dropdown */}
+            <div
+              className="relative"
+              onMouseEnter={() => setIsIndustriesOpen(true)}
+              onMouseLeave={() => setIsIndustriesOpen(false)}
+            >
+              <button
+                onClick={() => setIsIndustriesOpen((open) => !open)}
+                className="flex items-center gap-1 text-gray-300 hover:text-white transition-colors relative group"
+              >
+                Industries
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform ${isIndustriesOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              <AnimatePresence>
+                {isIndustriesOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-[34rem] glass-card rounded-2xl p-3 grid grid-cols-2 gap-1"
+                  >
+                    {industries.map((industry) => {
+                      const Icon = industry.icon
+                      return (
+                        <button
+                          key={industry.slug}
+                          onClick={() => goToIndustry(industry.slug)}
+                          className="flex items-center gap-3 text-left px-3 py-2.5 rounded-xl text-gray-300 hover:text-white hover:bg-white/5 transition-all group"
+                        >
+                          <span className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0 group-hover:bg-accent/20 transition-all">
+                            <Icon size={16} className="text-accent" />
+                          </span>
+                          <span className="text-sm font-medium">{industry.name}</span>
+                        </button>
+                      )
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             <LanguageSelector />
 
             {/* Login/Logout Button */}
@@ -182,6 +238,43 @@ const Navbar = () => {
                   </a>
                 )
               })}
+
+              {/* Mobile Industries submenu */}
+              <button
+                onClick={() => setIsMobileIndustriesOpen((open) => !open)}
+                className="w-full flex items-center justify-between py-3 text-gray-300 hover:text-white transition-colors"
+              >
+                Industries
+                <ChevronDown
+                  size={18}
+                  className={`transition-transform ${isMobileIndustriesOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              <AnimatePresence>
+                {isMobileIndustriesOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="pl-2 border-l border-white/10 ml-1"
+                  >
+                    {industries.map((industry) => {
+                      const Icon = industry.icon
+                      return (
+                        <button
+                          key={industry.slug}
+                          onClick={() => goToIndustry(industry.slug)}
+                          className="w-full flex items-center gap-3 text-left py-2.5 px-2 text-sm text-gray-400 hover:text-white transition-colors"
+                        >
+                          <Icon size={16} className="text-accent shrink-0" />
+                          {industry.name}
+                        </button>
+                      )
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <button
                 onClick={handleBookDemo}
                 className="w-full mt-4 px-6 py-2 bg-gradient-primary rounded-lg font-semibold"

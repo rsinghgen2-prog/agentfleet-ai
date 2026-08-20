@@ -2,6 +2,7 @@ import Hero from '../components/Hero'
 import Problems from '../components/Problems'
 import Solutions from '../components/Solutions'
 import Industries from '../components/Industries'
+import IndustryDetail from '../components/IndustryDetail'
 import Features from '../components/Features'
 import Metrics from '../components/Metrics'
 import Pricing from '../components/Pricing'
@@ -11,18 +12,19 @@ import CTA from '../components/CTA'
 
 const Home = () => {
   return (
-    <>
+    <div className="marketing-shell">
       <Hero />
       <Problems />
       <Solutions />
       <Industries />
+      <IndustryDetail />
       <Features />
       <Metrics />
       <Pricing />
       <Testimonials />
       <HowItWorks />
       <CTA />
-    </>
+    </div>
   )
 }
 
