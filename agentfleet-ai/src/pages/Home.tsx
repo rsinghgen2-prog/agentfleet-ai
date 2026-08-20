@@ -11,7 +11,7 @@ import CTA from '../components/CTA'
 
 const Home = () => {
   return (
-    <>
+    <div className="marketing-shell">
       <Hero />
       <Problems />
       <Solutions />
@@ -22,7 +22,7 @@ const Home = () => {
       <Testimonials />
       <HowItWorks />
       <CTA />
-    </>
+    </div>
   )
 }
 
