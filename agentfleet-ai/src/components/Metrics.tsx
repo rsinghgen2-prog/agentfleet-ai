@@ -65,7 +65,7 @@ const Metrics = () => {
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
             Results That <span className="gradient-text">Matter</span>
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+          <p className="text-xl text-[var(--text-muted)] max-w-3xl mx-auto">
             Real metrics from businesses using AgentFleet AI
           </p>
         </motion.div>
@@ -83,8 +83,8 @@ const Metrics = () => {
               <div className="text-6xl font-bold gradient-text mb-4">
                 <Counter value={metric.value} suffix={metric.suffix} />
               </div>
-              <h3 className="text-xl font-bold mb-2 text-white">{metric.title}</h3>
-              <p className="text-gray-400">{metric.description}</p>
+              <h3 className="text-xl font-bold mb-2 text-[var(--body-text)]">{metric.title}</h3>
+              <p className="text-[var(--text-muted)]">{metric.description}</p>
             </motion.div>
           ))}
         </div>

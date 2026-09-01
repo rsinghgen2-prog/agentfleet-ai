@@ -56,7 +56,7 @@ const Problems = () => {
 
   return (
     <section className="py-20 px-4 relative">
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-primary/5 to-background" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[var(--body-bg)] via-primary/5 to-[var(--body-bg)]" />
       
       <div className="relative max-w-7xl mx-auto">
         <motion.div
@@ -69,7 +69,7 @@ const Problems = () => {
             Growing Businesses Are{' '}
             <span className="gradient-text">Drowning in Repetitive Work</span>
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+          <p className="text-xl text-[var(--text-muted)] max-w-3xl mx-auto">
             Don't let operational inefficiencies hold your business back
           </p>
         </motion.div>
@@ -91,8 +91,8 @@ const Problems = () => {
               <div className="w-16 h-16 rounded-xl bg-red-500/10 flex items-center justify-center mb-4 group-hover:bg-red-500/20 transition-all">
                 <problem.icon size={32} className="text-red-400" />
               </div>
-              <h3 className="text-xl font-bold mb-2 text-white">{problem.title}</h3>
-              <p className="text-gray-400">{problem.description}</p>
+              <h3 className="text-xl font-bold mb-2 text-[var(--body-text)]">{problem.title}</h3>
+              <p className="text-[var(--text-muted)]">{problem.description}</p>
             </motion.div>
           ))}
         </motion.div>

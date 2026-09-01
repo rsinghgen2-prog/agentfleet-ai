@@ -14,7 +14,7 @@ const Hero = () => {
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-20 px-4 overflow-hidden">
       {/* Background Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-secondary/20" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-[var(--body-bg)] to-secondary/20" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(79,70,229,0.1),transparent_50%)]" />
 
       <div className="relative max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
@@ -48,7 +48,7 @@ const Hero = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="text-xl text-gray-300 mb-8 max-w-2xl"
+            className="text-xl text-[var(--text-muted)] mb-8 max-w-2xl"
           >
             AgentFleet AI gives your business an intelligent fleet of AI agents that answer customers,
             schedule appointments, follow up on leads, and automate operations 24/7.
@@ -64,7 +64,7 @@ const Hero = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => navigate('/book-demo')}
-              className="px-8 py-4 bg-gradient-primary rounded-lg font-semibold text-lg flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-primary/50 transition-all"
+              className="px-8 py-4 bg-gradient-primary text-white rounded-lg font-semibold text-lg flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-primary/50 transition-all"
             >
               Book a Demo <ArrowRight size={20} />
             </motion.button>

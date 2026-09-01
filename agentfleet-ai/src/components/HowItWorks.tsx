@@ -31,7 +31,7 @@ const HowItWorks = () => {
 
   return (
     <section id="how-it-works" className="py-20 px-4 relative">
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-secondary/5 to-background" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[var(--body-bg)] via-secondary/5 to-[var(--body-bg)]" />
       
       <div className="relative max-w-7xl mx-auto">
         <motion.div
@@ -43,7 +43,7 @@ const HowItWorks = () => {
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
             How It <span className="gradient-text">Works</span>
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+          <p className="text-xl text-[var(--text-muted)] max-w-3xl mx-auto">
             Get started in four simple steps and transform your business today
           </p>
         </motion.div>
@@ -72,8 +72,8 @@ const HowItWorks = () => {
                     <step.icon size={32} className="text-white" />
                   </div>
                   
-                  <h3 className="text-xl font-bold mb-3 text-white">{step.title}</h3>
-                  <p className="text-gray-400">{step.description}</p>
+                  <h3 className="text-xl font-bold mb-3 text-[var(--body-text)]">{step.title}</h3>
+                  <p className="text-[var(--text-muted)]">{step.description}</p>
                 </div>
               </motion.div>
             ))}

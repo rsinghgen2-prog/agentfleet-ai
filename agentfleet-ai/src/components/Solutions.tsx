@@ -55,7 +55,7 @@ const Solutions = () => {
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
             Meet Your <span className="gradient-text">AI Fleet</span>
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+          <p className="text-xl text-[var(--text-muted)] max-w-3xl mx-auto">
             A complete workforce of specialized AI agents ready to transform your business
           </p>
         </motion.div>
@@ -74,8 +74,8 @@ const Solutions = () => {
               <div className={`w-16 h-16 rounded-xl bg-gradient-to-r ${agent.color} flex items-center justify-center mb-4 shadow-lg group-hover:shadow-2xl transition-all`}>
                 <agent.icon size={32} className="text-white" />
               </div>
-              <h3 className="text-2xl font-bold mb-3 text-white">{agent.title}</h3>
-              <p className="text-gray-400 leading-relaxed">{agent.description}</p>
+              <h3 className="text-2xl font-bold mb-3 text-[var(--body-text)]">{agent.title}</h3>
+              <p className="text-[var(--text-muted)] leading-relaxed">{agent.description}</p>
             </motion.div>
           ))}
         </div>

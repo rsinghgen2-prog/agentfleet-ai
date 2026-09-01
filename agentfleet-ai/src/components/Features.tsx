@@ -47,7 +47,7 @@ const Features = () => {
 
   return (
     <section id="features" className="py-20 px-4 relative">
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-primary/5 to-background" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[var(--body-bg)] via-primary/5 to-[var(--body-bg)]" />
       
       <div className="relative max-w-7xl mx-auto">
         <motion.div
@@ -59,7 +59,7 @@ const Features = () => {
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
             Powerful <span className="gradient-text">Features</span>
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+          <p className="text-xl text-[var(--text-muted)] max-w-3xl mx-auto">
             Everything you need to run a modern, automated business
           </p>
         </motion.div>
@@ -78,8 +78,8 @@ const Features = () => {
               <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                 <feature.icon size={24} className="text-white" />
               </div>
-              <h3 className="font-bold mb-2 text-white">{feature.title}</h3>
-              <p className="text-gray-400 text-sm">{feature.description}</p>
+              <h3 className="font-bold mb-2 text-[var(--body-text)]">{feature.title}</h3>
+              <p className="text-[var(--text-muted)] text-sm">{feature.description}</p>
             </motion.div>
           ))}
         </div>

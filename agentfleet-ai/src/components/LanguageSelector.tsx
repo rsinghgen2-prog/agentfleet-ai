@@ -33,7 +33,7 @@ const LanguageSelector = () => {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="absolute top-full right-0 mt-2 glass-card rounded-lg overflow-hidden min-w-[180px] shadow-2xl border border-white/10"
+            className="absolute top-full right-0 mt-2 glass-card rounded-lg overflow-hidden min-w-[180px] shadow-2xl border border-[var(--border)]"
           >
             {languages.map((lang) => (
               <button
@@ -42,14 +42,14 @@ const LanguageSelector = () => {
                   setLanguage(lang.code as 'EN' | 'HI' | 'ES' | 'FR')
                   setIsOpen(false)
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-all text-left ${
+                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-muted)] transition-all text-left ${
                   language === lang.code ? 'bg-primary/20' : ''
                 }`}
               >
                 <span className="text-2xl">{lang.flag}</span>
                 <div className="flex-1">
-                  <div className="font-semibold text-white">{lang.name}</div>
-                  <div className="text-xs text-gray-400">{lang.code}</div>
+                  <div className="font-semibold text-[var(--body-text)]">{lang.name}</div>
+                  <div className="text-xs text-[var(--text-muted)]">{lang.code}</div>
                 </div>
                 {language === lang.code && (
                   <div className="w-2 h-2 rounded-full bg-primary" />

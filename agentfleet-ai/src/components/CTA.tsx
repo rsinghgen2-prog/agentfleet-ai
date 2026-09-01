@@ -6,7 +6,7 @@ const CTA = () => {
   const navigate = useNavigate()
   return (
     <section className="py-20 px-4 relative">
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-primary/10 to-background" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[var(--body-bg)] via-primary/10 to-[var(--body-bg)]" />
       
       <div className="relative max-w-5xl mx-auto">
         <motion.div
@@ -30,7 +30,7 @@ const CTA = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto"
+            className="text-xl text-[var(--text-muted)] mb-8 max-w-2xl mx-auto"
           >
             Join hundreds of businesses already saving time and increasing revenue with AgentFleet AI
           </motion.p>
@@ -46,7 +46,7 @@ const CTA = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => navigate('/book-demo')}
-              className="px-8 py-4 bg-gradient-primary rounded-lg font-semibold text-lg flex items-center justify-center gap-2 hover:shadow-2xl hover:shadow-primary/50 transition-all"
+              className="px-8 py-4 bg-gradient-primary text-white rounded-lg font-semibold text-lg flex items-center justify-center gap-2 hover:shadow-2xl hover:shadow-primary/50 transition-all"
             >
               <Calendar size={20} /> Schedule Free Consultation
             </motion.button>
@@ -65,7 +65,7 @@ const CTA = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ delay: 0.3 }}
-            className="mt-6 text-sm text-gray-400"
+            className="mt-6 text-sm text-[var(--text-muted)]"
           >
             No credit card required • 14-day free trial • Cancel anytime
           </motion.p>

@@ -40,7 +40,7 @@ const Testimonials = () => {
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
             Loved by <span className="gradient-text">Businesses</span>
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+          <p className="text-xl text-[var(--text-muted)] max-w-3xl mx-auto">
             See what our customers have to say about AgentFleet AI
           </p>
         </motion.div>
@@ -64,15 +64,15 @@ const Testimonials = () => {
                 ))}
               </div>
 
-              <p className="text-gray-300 mb-6 leading-relaxed">"{testimonial.content}"</p>
+              <p className="text-[var(--text-muted)] mb-6 leading-relaxed">"{testimonial.content}"</p>
 
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center text-2xl">
                   {testimonial.image}
                 </div>
                 <div>
-                  <h4 className="font-bold text-white">{testimonial.name}</h4>
-                  <p className="text-sm text-gray-400">{testimonial.role}</p>
+                  <h4 className="font-bold text-[var(--body-text)]">{testimonial.name}</h4>
+                  <p className="text-sm text-[var(--text-muted)]">{testimonial.role}</p>
                 </div>
               </div>
             </motion.div>

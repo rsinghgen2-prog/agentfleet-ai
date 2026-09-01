@@ -54,7 +54,7 @@ const Industries = () => {
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
             Built for <span className="gradient-text">Every Industry</span>
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+          <p className="text-xl text-[var(--text-muted)] max-w-3xl mx-auto">
             Tailored AI solutions that understand your industry's unique needs
           </p>
         </motion.div>
@@ -73,8 +73,8 @@ const Industries = () => {
               <div className="w-14 h-14 rounded-xl bg-accent/10 flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-all">
                 <industry.icon size={28} className="text-accent" />
               </div>
-              <h3 className="text-lg font-bold mb-2 text-white">{industry.title}</h3>
-              <p className="text-gray-400 text-sm">{industry.description}</p>
+              <h3 className="text-lg font-bold mb-2 text-[var(--body-text)]">{industry.title}</h3>
+              <p className="text-[var(--text-muted)] text-sm">{industry.description}</p>
             </motion.div>
           ))}
         </div>

@@ -30,8 +30,8 @@ const Footer = () => {
   }
 
   return (
-    <footer className="relative py-16 px-4 border-t border-white/10">
-      <div className="absolute inset-0 bg-gradient-to-b from-background to-black/50" />
+    <footer className="relative py-16 px-4 border-t border-[var(--border)]">
+      <div className="absolute inset-0 bg-gradient-to-b from-[var(--body-bg)] to-[var(--surface-strong)]" />
       
       <div className="relative max-w-7xl mx-auto">
         <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
@@ -44,7 +44,7 @@ const Footer = () => {
               <Bot className="w-8 h-8 text-primary" />
               <span className="text-xl font-bold gradient-text">AgentFleet AI</span>
             </motion.div>
-            <p className="text-gray-400 mb-4">
+            <p className="text-[var(--text-muted)] mb-4">
               Your AI Workforce, Ready on Day One.
             </p>
             <div className="flex gap-4">
@@ -77,13 +77,13 @@ const Footer = () => {
           {/* Links Columns */}
           {Object.entries(footerLinks).map(([category, links]) => (
             <div key={category}>
-              <h3 className="font-bold text-white mb-4">{category}</h3>
+              <h3 className="font-bold text-[var(--body-text)] mb-4">{category}</h3>
               <ul className="space-y-2">
                 {links.map((link) => (
                   <li key={link.name}>
                     <a
                       href={link.href}
-                      className="text-gray-400 hover:text-white transition-colors"
+                      className="text-[var(--text-muted)] hover:text-[var(--body-text)] transition-colors"
                     >
                       {link.name}
                     </a>
@@ -94,7 +94,7 @@ const Footer = () => {
           ))}
         </div>
 
-        <div className="pt-8 border-t border-white/10 text-center text-gray-400">
+        <div className="pt-8 border-t border-[var(--border)] text-center text-[var(--text-muted)]">
           <p>&copy; 2026 AgentFleet AI. All rights reserved.</p>
         </div>
       </div>

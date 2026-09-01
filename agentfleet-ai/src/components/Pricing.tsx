@@ -178,7 +178,7 @@ const Pricing = () => {
 
   return (
     <section id="pricing" className="py-20 px-4 relative">
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-secondary/5 to-background" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[var(--body-bg)] via-secondary/5 to-[var(--body-bg)]" />
 
       <div className="relative max-w-7xl mx-auto">
         <motion.div
@@ -198,7 +198,7 @@ const Pricing = () => {
               <>Simple, <span className="gradient-text">Transparent Pricing</span></>
             )}
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto mb-8">
+          <p className="text-xl text-[var(--text-muted)] max-w-3xl mx-auto mb-8">
             {language === 'HI'
               ? 'अपनी व्यावसायिक आवश्यकताओं के अनुरूप योजना चुनें'
               : language === 'ES'
@@ -217,7 +217,7 @@ const Pricing = () => {
                 className={`px-6 py-2 rounded-full font-semibold transition-all ${
                   currency === 'USD'
                     ? 'bg-gradient-primary text-white'
-                    : 'text-gray-400 hover:text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--body-text)]'
                 }`}
               >
                 USD ($)
@@ -227,14 +227,14 @@ const Pricing = () => {
                 className={`px-6 py-2 rounded-full font-semibold transition-all ${
                   currency === 'INR'
                     ? 'bg-gradient-primary text-white'
-                    : 'text-gray-400 hover:text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--body-text)]'
                 }`}
               >
                 INR (₹)
               </button>
             </div>
             {isIndia && (
-              <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
                 <Globe size={16} className="text-accent" />
                 <span>Detected location: India</span>
               </div>
@@ -266,10 +266,10 @@ const Pricing = () => {
                 </div>
               )}
 
-              <h3 className="text-2xl font-bold mb-2 text-white">
+              <h3 className="text-2xl font-bold mb-2 text-[var(--body-text)]">
                 {getLocalizedContent(plan, 'name')}
               </h3>
-              <p className="text-gray-400 mb-6">
+              <p className="text-[var(--text-muted)] mb-6">
                 {getLocalizedContent(plan, 'description')}
               </p>
 
@@ -277,11 +277,11 @@ const Pricing = () => {
                 <span className="text-5xl font-bold gradient-text">
                   {currency === 'USD' ? plan.priceUSD : plan.priceINR}
                 </span>
-                <span className="text-gray-400">/month</span>
+                <span className="text-[var(--text-muted)]">/month</span>
               </div>
 
               {currency === 'INR' && (
-                <div className="mb-4 text-sm text-gray-500">
+                <div className="mb-4 text-sm text-[var(--text-muted)]">
                   ({plan.priceUSD} {
                     language === 'HI' ? 'USD के बराबर' :
                     language === 'ES' ? 'USD equivalente' :
@@ -295,7 +295,7 @@ const Pricing = () => {
                 {(getLocalizedContent(plan, 'features') as string[]).map((feature, idx) => (
                   <li key={idx} className="flex items-start gap-3">
                     <Check size={20} className="text-primary flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-300">{feature}</span>
+                    <span className="text-[var(--text-muted)]">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -325,7 +325,7 @@ const Pricing = () => {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="text-center mt-12 text-sm text-gray-500"
+          className="text-center mt-12 text-sm text-[var(--text-muted)]"
         >
           {language === 'HI' ? (
             <>

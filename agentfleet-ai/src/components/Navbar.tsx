@@ -75,18 +75,18 @@ const Navbar = () => {
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           {/* Logo */}
           <motion.div
             whileHover={{ scale: 1.05 }}
-            className="flex items-center space-x-2 cursor-pointer"
+            className="flex items-center space-x-2 cursor-pointer shrink-0"
           >
-            <Bot className="w-8 h-8 text-primary" />
-            <span className="text-2xl font-bold gradient-text">AgentFleet AI</span>
+            <Bot className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
+            <span className="text-xl sm:text-2xl font-bold gradient-text">AgentFleet AI</span>
           </motion.div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-4">
+          {/* Desktop Navigation Links */}
+          <div className="hidden lg:flex items-center gap-6 xl:gap-8">
             {navLinks.map((link) => {
               const sectionId = link.href.replace('#', '')
               const isActive = activeSection === sectionId
@@ -95,8 +95,8 @@ const Navbar = () => {
                 <a
                   key={link.name}
                   href={link.href}
-                  className={`transition-colors relative group ${
-                    isActive ? 'text-white font-semibold' : 'text-gray-300 hover:text-white'
+                  className={`transition-colors relative group whitespace-nowrap ${
+                    isActive ? 'text-[var(--body-text)] font-semibold' : 'text-[var(--text-muted)] hover:text-[var(--body-text)]'
                   }`}
                 >
                   {link.name}
@@ -106,12 +106,14 @@ const Navbar = () => {
                 </a>
               )
             })}
-            <LanguageSelector />
+          </div>
 
+          {/* Desktop Right Actions */}
+          <div className="hidden lg:flex items-center gap-3 shrink-0">
             {/* Login/Logout Button */}
             {isLoggedIn ? (
-              <div className="flex items-center gap-4">
-                <span className="text-gray-400 text-sm hidden md:block">
+              <div className="flex items-center gap-3">
+                <span className="text-[var(--text-muted)] text-sm hidden xl:flex items-center">
                   <User size={16} className="inline mr-1" />
                   {currentUser.split('@')[0]}
                 </span>
@@ -137,23 +139,31 @@ const Navbar = () => {
               </motion.button>
             )}
 
+            {/* Language selector sits right next to Book a Demo */}
+            <LanguageSelector />
+
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleBookDemo}
-              className="px-6 py-2 bg-gradient-primary rounded-lg font-semibold hover:shadow-lg hover:shadow-primary/50 transition-all"
+              className="px-5 xl:px-6 py-2 bg-gradient-primary text-white rounded-lg font-semibold whitespace-nowrap hover:shadow-lg hover:shadow-primary/50 transition-all"
             >
               Book a Demo
             </motion.button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden text-white"
-          >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+          {/* Mobile/Tablet Controls */}
+          <div className="flex items-center gap-2 lg:hidden">
+            <LanguageSelector />
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="text-[var(--body-text)] p-2"
+              aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+            >
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
@@ -163,7 +173,7 @@ const Navbar = () => {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="md:hidden mt-4 glass-card rounded-lg p-4"
+              className="lg:hidden mt-4 glass-card rounded-lg p-4"
             >
               {navLinks.map((link) => {
                 const sectionId = link.href.replace('#', '')
@@ -175,19 +185,58 @@ const Navbar = () => {
                     href={link.href}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={`block py-3 transition-colors ${
-                      isActive ? 'text-white font-semibold' : 'text-gray-300 hover:text-white'
+                      isActive ? 'text-[var(--body-text)] font-semibold' : 'text-[var(--text-muted)] hover:text-[var(--body-text)]'
                     }`}
                   >
                     {link.name}
                   </a>
                 )
               })}
-              <button
-                onClick={handleBookDemo}
-                className="w-full mt-4 px-6 py-2 bg-gradient-primary rounded-lg font-semibold"
-              >
-                Book a Demo
-              </button>
+
+              <div className="mt-3 pt-3 border-t border-[var(--border)] flex flex-col gap-3">
+                {isLoggedIn ? (
+                  <>
+                    <span className="text-[var(--text-muted)] text-sm flex items-center">
+                      <User size={16} className="inline mr-1" />
+                      {currentUser.split('@')[0]}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false)
+                        handleLogout()
+                      }}
+                      className="w-full px-4 py-2 glass-card rounded-lg font-semibold hover:border-red-500/50 text-red-400 transition-all flex items-center justify-center gap-2"
+                    >
+                      <LogOut size={16} />
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                      navigate('/login')
+                    }}
+                    className="w-full px-4 py-2 glass-card rounded-lg font-semibold hover:border-primary/50 transition-all flex items-center justify-center gap-2"
+                  >
+                    <User size={16} />
+                    Login
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false)
+                    handleBookDemo()
+                  }}
+                  className="w-full px-6 py-2 bg-gradient-primary text-white rounded-lg font-semibold"
+                >
+                  Book a Demo
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
