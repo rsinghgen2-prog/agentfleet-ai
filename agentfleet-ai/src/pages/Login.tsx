@@ -81,7 +81,7 @@ const Login = () => {
     const client = getClientByEmail(email)
     if (client) {
       let authenticated = false
-      let accessToken: string | null = null
+      let accessToken: string = ''
       try {
         if (!AUTH_API_URL) {
           throw new Error('Authentication service URL is not configured')
@@ -93,7 +93,7 @@ const Login = () => {
         })
         const authBody = await authResponse.json().catch(() => ({}))
         if (authResponse.ok && authBody.data?.tokens?.accessToken) {
-          accessToken = authBody.data.tokens.accessToken
+          accessToken = authBody.data.tokens.accessToken || ''
           localStorage.setItem('accessToken', accessToken)
           if (authBody.data.tokens.refreshToken) localStorage.setItem('refreshToken', authBody.data.tokens.refreshToken)
           authenticated = true
@@ -140,8 +140,8 @@ const Login = () => {
       // Determine tenant slug from known tenants or try common ones
       const knownTenants = ['vps-dental', 'abc-dental']
       let authenticated = false
-      let accessToken: string | null = null
-      let lastError: string | null = null
+      let accessToken: string = ''
+      let lastError: string = ''
       
       for (const tenantSlug of knownTenants) {
         try {
@@ -153,7 +153,7 @@ const Login = () => {
           const authBody = await authResponse.json().catch(() => ({}))
           
           if (authResponse.ok && authBody.data?.tokens?.accessToken) {
-            accessToken = authBody.data.tokens.accessToken
+            accessToken = authBody.data.tokens.accessToken || ''
             localStorage.setItem('accessToken', accessToken)
             if (authBody.data.tokens.refreshToken) localStorage.setItem('refreshToken', authBody.data.tokens.refreshToken)
             authenticated = true
