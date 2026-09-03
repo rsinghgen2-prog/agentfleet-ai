@@ -46,7 +46,7 @@ const rangeDates = (baseDate: string, range: PatientRange) => {
 }
 
 export default function DentalClientStitchDashboard() {
-  const navigate = useNavigate()
+  const routerNavigate = useNavigate()
   const { client, data, loading, error, refresh } = useDentalDashboardData()
   const [bookingOpen, setBookingOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -94,6 +94,13 @@ export default function DentalClientStitchDashboard() {
     return appointments.filter((item) => `${item.first_name} ${item.last_name} ${item.phone} ${item.email} ${item.appointment_type} ${item.reason}`.toLowerCase().includes(needle))
   }, [appointments, searchQuery])
   const selected = filteredAppointments.find((item) => item.id === selectedId) || filteredAppointments[0]
+  const navigate = (path: string) => {
+    if (selected && path === `/dental-client/customers/${selected.patient_id}`) {
+      routerNavigate(`/dental-client/consultation/${selected.id}`)
+      return
+    }
+    routerNavigate(path)
+  }
   const calendarDays = useMemo(() => calendarCells(calendarMonth), [calendarMonth])
   const appointmentDates = useMemo(() => new Set(calendarAppointments.filter((item) => item.status !== 'cancelled').map((item) => item.appointment_date.slice(0, 10))), [calendarAppointments])
   const displayName = client?.clientName || 'Dr. Rajeev Pratap Singh'

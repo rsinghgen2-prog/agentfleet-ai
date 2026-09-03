@@ -18,7 +18,7 @@ const appointmentInput = z.object({
   appointmentTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/),
   duration: z.number().int().min(5).max(480).default(30), appointmentType: z.string().trim().min(1).max(100),
   status: z.enum(['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show']).default('scheduled'),
-  reason: z.string().trim().max(2000).optional().nullable(), notes: z.string().trim().max(5000).optional().nullable(),
+  reason: z.string().trim().max(2000).optional().nullable(), notes: z.string().trim().max(5000).optional().nullable(), diagnosis: z.string().trim().max(5000).optional().nullable(), treatment_plan: z.record(z.string(), z.unknown()).optional().nullable(),
   followUpRequired: z.boolean().default(false), followUpDate: z.string().date().optional().nullable(),
 })
 

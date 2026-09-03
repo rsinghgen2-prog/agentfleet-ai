@@ -2,7 +2,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3010'
 const DEMO_MODE = import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === 'true'
 
 export interface Patient { id: string; first_name: string; last_name: string; phone?: string; email?: string; gender?: string; date_of_birth?: string; notes?: string; last_visit?: string | null; next_appointment?: string | null }
-export interface Appointment { id: string; patient_id: string; appointment_date: string; appointment_time: string; duration: number; appointment_type: string; status: string; reason: string; notes: string; first_name: string; last_name: string; phone: string; email?: string; gender: string }
+export interface Appointment { id: string; patient_id: string; appointment_date: string; appointment_time: string; duration: number; appointment_type: string; status: string; reason: string; notes: string; diagnosis?: string | null; treatment_plan?: Record<string, unknown> | null; first_name: string; last_name: string; phone: string; email?: string; gender: string }
 export interface DentistNote { id: string; title: string; content: string; expires_at: string; is_active: boolean; created_by?: string | null; created_at: string; updated_at: string }
 export interface DentistNoteInput { title: string; content: string; expiresAt?: string | null }
 export interface InventoryItem { id: string; name: string; category: string; quantity: number; reorder_level: number; unit: string; is_active?: boolean; low_stock?: boolean }
@@ -45,7 +45,7 @@ export interface PaymentInput { customerId: string; paymentNumber?: string; amou
 export interface PaymentUpdateInput { amount?: number; currency?: string; status?: PaymentStatus; method?: PaymentMethod | null; description?: string }
 export interface PaymentSummary { total_payments: number; total_amount: number; collected_amount: number; pending_amount: number; refunded_amount: number; paid_count: number; pending_count: number; customers_count: number }
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show'
-export interface AppointmentUpdateInput { patientId?: string; appointmentDate?: string; appointmentTime?: string; duration?: number; appointmentType?: string; status?: AppointmentStatus; reason?: string | null; notes?: string | null; followUpRequired?: boolean; followUpDate?: string | null }
+export interface AppointmentUpdateInput { patientId?: string; appointmentDate?: string; appointmentTime?: string; duration?: number; appointmentType?: string; status?: AppointmentStatus; reason?: string | null; notes?: string | null; diagnosis?: string | null; treatment_plan?: Record<string, unknown> | null; followUpRequired?: boolean; followUpDate?: string | null }
 
 function normalizePatientProfile(raw: { patient: Patient; appointments?: Array<Record<string, unknown>>; prescriptions?: Array<Record<string, unknown>>; reports?: Array<Record<string, unknown>>; labOrders?: Array<Record<string, unknown>>; dispatchHistory?: Array<Record<string, unknown>> }): PatientProfile {
   const appointments = raw.appointments || []
@@ -222,6 +222,7 @@ export class DashboardService {
     const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } })
     const body = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(body.message || `Request failed (${response.status})`)
+    if (!Object.prototype.hasOwnProperty.call(body, 'data')) throw new Error('API returned an invalid response')
     return body.data as T
   }
 
