@@ -5,6 +5,7 @@ import { Mail, Lock, ArrowLeft, Sparkles, AlertCircle, Check, Moon, Sun } from '
 import { SUPER_ADMIN, validateSuperAdmin } from '../config/superAdmin'
 import { getClientByEmail, validateClient } from '../config/clients'
 import { useTheme } from '../context/ThemeContext'
+import { decodeJWT, jwtToUserRegistration } from '../utils/jwtUtils'
 
 const DEMO_MODE = import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === 'true'
 const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '')
@@ -76,10 +77,11 @@ const Login = () => {
       return
     }
 
-    // 2. Check if Client (Multi-tenant)
+    // 2. Check if Client (Pre-configured)
     const client = getClientByEmail(email)
     if (client) {
       let authenticated = false
+      let accessToken: string | null = null
       try {
         if (!AUTH_API_URL) {
           throw new Error('Authentication service URL is not configured')
@@ -91,7 +93,8 @@ const Login = () => {
         })
         const authBody = await authResponse.json().catch(() => ({}))
         if (authResponse.ok && authBody.data?.tokens?.accessToken) {
-          localStorage.setItem('accessToken', authBody.data.tokens.accessToken)
+          accessToken = authBody.data.tokens.accessToken
+          localStorage.setItem('accessToken', accessToken)
           if (authBody.data.tokens.refreshToken) localStorage.setItem('refreshToken', authBody.data.tokens.refreshToken)
           authenticated = true
         } else if (!DEMO_MODE) {
@@ -107,6 +110,16 @@ const Login = () => {
         setError('Invalid email or password')
         return
       }
+      
+      // Extract user data from JWT token
+      if (accessToken) {
+        const payload = decodeJWT(accessToken)
+        if (payload) {
+          const userRegistration = jwtToUserRegistration(payload)
+          localStorage.setItem('userRegistration', JSON.stringify(userRegistration))
+        }
+      }
+      
       localStorage.setItem('isLoggedIn', 'true')
       localStorage.setItem('userType', 'client')
       localStorage.setItem('clientData', JSON.stringify(client))
@@ -118,7 +131,73 @@ const Login = () => {
       return
     }
 
-    // 3. Regular user login
+    // 3. Try tenant user login (from database, not pre-configured)
+    try {
+      if (!AUTH_API_URL) {
+        throw new Error('Authentication service URL is not configured')
+      }
+      
+      // Determine tenant slug from known tenants or try common ones
+      const knownTenants = ['vps-dental', 'abc-dental']
+      let authenticated = false
+      let accessToken: string | null = null
+      let lastError: string | null = null
+      
+      for (const tenantSlug of knownTenants) {
+        try {
+          const authResponse = await fetch(`${AUTH_API_URL}/api/v1/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, tenantSlug }),
+          })
+          const authBody = await authResponse.json().catch(() => ({}))
+          
+          if (authResponse.ok && authBody.data?.tokens?.accessToken) {
+            accessToken = authBody.data.tokens.accessToken
+            localStorage.setItem('accessToken', accessToken)
+            if (authBody.data.tokens.refreshToken) localStorage.setItem('refreshToken', authBody.data.tokens.refreshToken)
+            authenticated = true
+            break
+          } else if (authResponse.status !== 404) {
+            lastError = authBody.message || 'Login failed'
+          }
+        } catch (e) {
+          // Try next tenant
+          continue
+        }
+      }
+      
+      if (!authenticated) {
+        if (lastError) {
+          setError(lastError)
+        } else {
+          setError('Invalid email or password')
+        }
+        return
+      }
+      
+      // Extract user data from JWT token
+      if (accessToken) {
+        const payload = decodeJWT(accessToken)
+        if (payload) {
+          const userRegistration = jwtToUserRegistration(payload)
+          localStorage.setItem('userRegistration', JSON.stringify(userRegistration))
+        }
+      }
+      
+      localStorage.setItem('isLoggedIn', 'true')
+      localStorage.setItem('userType', 'tenant-user')
+      localStorage.setItem('currentUser', email)
+      navigate('/dental-client')
+      return
+    } catch (authError) {
+      if (!DEMO_MODE) {
+        setError(getAuthErrorMessage(authError))
+        return
+      }
+    }
+
+    // 4. Regular user login (fallback to stored registration)
     const storedRegistration = localStorage.getItem('userRegistration')
 
     if (!storedRegistration) {
