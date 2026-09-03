@@ -161,7 +161,7 @@ const Login = () => {
           } else if (authResponse.status !== 404) {
             lastError = authBody.message || 'Login failed'
           }
-        } catch (e) {
+        } catch {
           // Try next tenant
           continue
         }

@@ -24,6 +24,7 @@ import DentalClientPayments from './pages/DentalClientPayments'
 import DentalClientSettings from './pages/DentalClientSettings'
 import DentalClientShell from './components/dental/DentalClientShell'
 import Settings from './pages/Settings'
+import PatientConsultation from './pages/PatientConsultation'
 
 type UserType = 'client' | 'super-admin' | 'registered-user'
 
@@ -104,6 +105,7 @@ function App() {
               <Route path="inventory" element={<DentalClientInventory />} />
               <Route path="payments" element={<DentalClientPayments />} />
               <Route path="settings" element={<DentalClientSettings />} />
+              <Route path="consultation/:appointmentId" element={<PatientConsultation />} />
             </Route>
             <Route path="/settings" element={
               <ProtectedRoute>
