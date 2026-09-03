@@ -1,6 +1,7 @@
 {
   // Cloudflare Worker + Container wrapper for the auth-service Express app.
   // Deploy with: npx wrangler deploy  (Docker must be running locally)
+  "account_id": "793968892828e043e9d9dcb8ca1447f6",
   "name": "agentfleet-auth-service",
   "main": "worker.ts",
   "compatibility_date": "2024-09-23",
@@ -32,11 +33,10 @@
   ],
 
   // Hyperdrive pools + caches connections to the Neon Postgres database.
-  // Replace <YOUR_HYPERDRIVE_ID> with the id printed by `wrangler hyperdrive create`.
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "<YOUR_HYPERDRIVE_ID>"
+      "id": "c29c83df22504223bc378a9924e020a1"
     }
   ],
 
