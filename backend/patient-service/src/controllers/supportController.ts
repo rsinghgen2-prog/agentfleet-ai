@@ -10,7 +10,7 @@ const supportTableInitializers = new Map<string, Promise<void>>()
 
 function schema(req: TenantRequest) { if (!req.tenant) throw new Error('Tenant context is missing'); return quoteIdentifier(req.tenant.schemaName) }
 function actor(req: TenantRequest) { return req.user?.userId || null }
-function isSupportAgent(req: TenantRequest) { return ['admin', 'semi_admin', 'staff'].includes(req.user?.role || '') }
+function isSupportAgent(req: TenantRequest) { return ['admin', 'semi_admin', 'staff', 'client', 'client_admin', 'owner'].includes(req.user?.role || '') }
 function sendError(res: Response, error: unknown, message: string) { if (error instanceof z.ZodError) return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues }); console.error(error); return res.status(500).json({ success: false, message }) }
 
 function ensureSupportTables(s: string) {
