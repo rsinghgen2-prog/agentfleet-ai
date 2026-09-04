@@ -14,6 +14,7 @@ import EnhancedDashboard from './pages/EnhancedDashboard'
 import DentalDashboard from './pages/DentalDashboard'
 import IndustryDashboard from './pages/IndustryDashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import DentalClientOverview from './pages/DentalClientOverview'
 import DentalClientStitchDashboard from './pages/DentalClientStitchDashboard'
 import DentalClientPatients from './pages/DentalClientPatients'
 import PatientProfile from './pages/PatientProfile'
@@ -25,6 +26,7 @@ import DentalClientSettings from './pages/DentalClientSettings'
 import DentalClientShell from './components/dental/DentalClientShell'
 import Settings from './pages/Settings'
 import PatientConsultation from './pages/PatientConsultation'
+import ClinicalWorkspace from './pages/ClinicalWorkspace'
 
 type UserType = 'client' | 'super-admin' | 'registered-user'
 
@@ -97,6 +99,8 @@ function App() {
 
             <Route path="/dental-client" element={<ProtectedRoute allowedUserTypes={['client']}><DentalClientShell /></ProtectedRoute>}>
               <Route index element={<DentalClientStitchDashboard />} />
+              <Route path="dashboard" element={<DentalClientStitchDashboard />} />
+              <Route path="customers-overview" element={<DentalClientOverview />} />
               <Route path="patients" element={<DentalClientPatients />} />
               <Route path="patients/:id" element={<PatientProfile />} />
               <Route path="customers" element={<CustomerDetails />} />
@@ -106,6 +110,11 @@ function App() {
               <Route path="payments" element={<DentalClientPayments />} />
               <Route path="settings" element={<DentalClientSettings />} />
               <Route path="consultation/:appointmentId" element={<PatientConsultation />} />
+              <Route path="dental-chart" element={<ClinicalWorkspace kind="chart" />} />
+              <Route path="treatment-plan" element={<ClinicalWorkspace kind="treatment" />} />
+              <Route path="medical-history" element={<ClinicalWorkspace kind="history" />} />
+              <Route path="documents" element={<ClinicalWorkspace kind="documents" />} />
+              <Route path="communications" element={<ClinicalWorkspace kind="communications" />} />
             </Route>
             <Route path="/settings" element={
               <ProtectedRoute>

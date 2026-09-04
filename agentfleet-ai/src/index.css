@@ -223,6 +223,78 @@ body {
   transform: translateY(-2px);
 }
 
+.consultation-shell {
+  color: var(--dental-text);
+}
+
+.consultation-shell > section {
+  border-radius: 24px;
+}
+
+.consultation-shell .dental-stitch-card {
+  box-shadow: 0 10px 30px rgba(15, 54, 92, 0.06), 0 2px 8px rgba(15, 54, 92, 0.03);
+}
+
+@media (min-width: 1024px) {
+  .overview-grid {
+    grid-template-columns: minmax(220px, 0.86fr) minmax(320px, 1.24fr) minmax(280px, 1fr);
+    grid-template-rows: minmax(220px, auto) minmax(190px, auto) auto;
+    grid-auto-flow: row;
+    align-items: start;
+    gap: 1.25rem;
+  }
+
+  .overview-grid > .space-y-4 {
+    display: contents;
+  }
+
+  .overview-grid > .space-y-4 > .dental-stitch-card {
+    grid-column: auto;
+    min-width: 0;
+    align-self: start;
+  }
+
+  .overview-grid > .space-y-4:first-child > .dental-stitch-card:first-child {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .overview-grid > .space-y-4:first-child > .dental-stitch-card:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .overview-grid > .space-y-4:nth-child(2) > .dental-stitch-card:first-child {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .overview-grid > .space-y-4:nth-child(2) > .dental-stitch-card:nth-child(2) {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .overview-grid > .space-y-4:nth-child(2) > .dental-stitch-card:nth-child(3) {
+    grid-column: 3;
+    grid-row: 3;
+  }
+
+  .overview-grid > .space-y-4:nth-child(3) > .dental-stitch-card:first-child {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .overview-grid > .space-y-4:nth-child(3) > .dental-stitch-card:nth-child(2) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .overview-grid > .dental-stitch-card {
+    width: 100%;
+  }
+}
+
+
 .dental-stitch-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
 .dental-stitch-scrollbar::-webkit-scrollbar-thumb { background: #dce3ec; border-radius: 10px; }
 .dental-stitch-hide-scrollbar::-webkit-scrollbar { display: none; }
