@@ -27,6 +27,11 @@ const Login = () => {
   })
   const [error, setError] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetTenant, setResetTenant] = useState('vps-dental')
+  const [resetMessage, setResetMessage] = useState('')
+  const [resetting, setResetting] = useState(false)
 
   // Load saved credentials on component mount
   useEffect(() => {
@@ -48,6 +53,16 @@ const Login = () => {
       [e.target.name]: e.target.value
     })
     setError('')
+  }
+
+  const handlePasswordReset = async (event: React.FormEvent) => {
+    event.preventDefault(); setResetting(true); setResetMessage(''); setError('')
+    try {
+      const response = await fetch(`${AUTH_API_URL}/api/v1/auth/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: formData.email.trim().toLowerCase(), tenantSlug: resetTenant, newPassword: resetPassword }) })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body.message || 'Unable to reset password')
+      setResetMessage('Password reset successfully. You can sign in now.'); setResetPassword('')
+    } catch (reason) { setResetMessage(getAuthErrorMessage(reason)) } finally { setResetting(false) }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -353,7 +368,7 @@ const Login = () => {
               {/* Forgot Password */}
               <button
                 type="button"
-                onClick={() => alert('Password reset feature coming soon!')}
+                onClick={() => { setResetOpen(true); setResetMessage('') }}
                 className="text-sm text-primary hover:underline"
               >
                 Forgot Password?
@@ -371,6 +386,8 @@ const Login = () => {
             </motion.button>
           </form>
         </motion.div>
+
+        {resetOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl"><div className="mb-5 flex items-start justify-between"><div><h2 className="text-xl font-bold">Reset password</h2><p className="mt-1 text-sm text-[var(--text-muted)]">Enter your account email and clinic tenant.</p></div><button type="button" onClick={() => setResetOpen(false)} className="text-sm text-[var(--text-muted)] hover:text-[var(--body-text)]">Close</button></div><form onSubmit={handlePasswordReset} className="space-y-4"><label className="block text-sm font-semibold">Tenant<select value={resetTenant} onChange={(event) => setResetTenant(event.target.value)} className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-[var(--body-text)]"><option value="vps-dental">V.P.S. Dental &amp; Oral Care</option><option value="abc-dental">ABC Dental Care</option></select></label><label className="block text-sm font-semibold">New password<input type="password" minLength={8} required value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="At least 8 characters" className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-[var(--body-text)]" /></label>{resetMessage && <p role="status" className={`text-sm ${resetMessage.includes('successfully') ? 'text-emerald-600' : 'text-red-500'}`}>{resetMessage}</p>}<button disabled={resetting} className="w-full rounded-lg bg-gradient-primary py-3 font-semibold text-white disabled:opacity-50">{resetting ? 'Resetting...' : 'Reset password'}</button></form></div></div>}
 
         {/* Register Link */}
         <p className="text-center mt-6 text-[var(--text-muted)]">

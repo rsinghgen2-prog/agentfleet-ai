@@ -12,6 +12,12 @@ interface LoginRequest {
   tenantSlug?: string;
 }
 
+interface ResetPasswordRequest {
+  email: string;
+  tenantSlug?: string;
+  newPassword: string;
+}
+
 interface JWTPayload {
   userId: string;
   email: string;
@@ -22,6 +28,26 @@ interface JWTPayload {
 }
 
 export class AuthController {
+  async resetPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, tenantSlug, newPassword }: ResetPasswordRequest = req.body;
+      if (typeof email !== 'string' || !email.trim() || typeof tenantSlug !== 'string' || !tenantSlug.trim() || typeof newPassword !== 'string' || newPassword.length < 8) {
+        return res.status(400).json({ success: false, message: 'Email, tenant slug, and a password of at least 8 characters are required' });
+      }
+      const tenantQuery = await pool.query('SELECT schema_name, is_active, subscription_status FROM public.tenants WHERE slug = $1', [tenantSlug.trim()]);
+      if (!tenantQuery.rowCount) return res.status(404).json({ success: false, message: 'Organization not found' });
+      const tenant = tenantQuery.rows[0];
+      if (!tenant.is_active || tenant.subscription_status === 'suspended') return res.status(403).json({ success: false, message: 'Organization account is suspended' });
+      const schema = quoteIdentifier(tenant.schema_name);
+      const passwordHash = await bcrypt.hash(newPassword, 12);
+      const result = await pool.query(`UPDATE ${schema}.users SET password_hash = $1, failed_login_attempts = 0, updated_at = NOW() WHERE LOWER(email) = LOWER($2) AND is_active RETURNING id`, [passwordHash, email.trim()]);
+      if (!result.rowCount) return res.status(404).json({ success: false, message: 'Active user not found' });
+      return res.json({ success: true, message: 'Password reset successfully' });
+    } catch (error) {
+      logger.error('Password reset error:', error);
+      next(error);
+    }
+  }
   /**
    * User Login
    * POST /api/v1/auth/login
