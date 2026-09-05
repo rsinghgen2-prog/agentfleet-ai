@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react'
 import { AlertTriangle, ArrowLeft, CalendarDays, CheckCircle2, ChevronDown, Edit3, FileText, Heart, Mail, Phone, Printer, Save, Share2, Upload, X } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { DentalChartPanel } from '../components/dental/DentalChartPanel'
+import { DocumentsPanel } from '../components/dental/DocumentsPanel'
 import { MedicalHistoryPanel } from '../components/dental/MedicalHistoryPanel'
 import { TreatmentPlanPanel } from '../components/dental/TreatmentPlanPanel'
 import { DashboardService, type Appointment, type PatientProfile, type TreatmentPlan } from '../services/dashboardService'
 import { describeApiError } from '../utils/apiError'
 import { patientDisplayName, patientInitials } from '../utils/clinicSchedule'
+import { buildVisitCharges, chargesDescription, chargesTotal } from '../utils/visitCharges'
 
 type Action = 'back' | 'complete'
-type Tab = 'Visit' | 'Dental Chart' | 'Treatment Plan' | 'Imaging' | 'Medical History' | 'Complete'
+type Tab = 'Visit' | 'Dental Chart' | 'Treatment Plan' | 'Imaging' | 'Documents' | 'Medical History' | 'Complete'
 type Draft = { reason: string; duration: string; painLevel: string; bloodPressure: string; pulse: string; temperature: string; exam: string; findings: string; treatment: string; notes: string }
 
-const tabs: Tab[] = ['Visit', 'Dental Chart', 'Treatment Plan', 'Imaging', 'Medical History', 'Complete']
+const tabs: Tab[] = ['Visit', 'Dental Chart', 'Treatment Plan', 'Imaging', 'Documents', 'Medical History', 'Complete']
 const blankDraft: Draft = { reason: '', duration: '', painLevel: '0', bloodPressure: '', pulse: '', temperature: '', exam: '', findings: '', treatment: '', notes: '' }
 const inputClass = 'mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-200'
 const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -21,6 +23,7 @@ const tabFromQuery = (value: string | null): Tab => {
   if (value === 'chart' || value === 'dental-chart') return 'Dental Chart'
   if (value === 'plan' || value === 'treatment' || value === 'treatment-plan') return 'Treatment Plan'
   if (value === 'imaging') return 'Imaging'
+  if (value === 'documents' || value === 'document') return 'Documents'
   if (value === 'history' || value === 'medical-history') return 'Medical History'
   if (value === 'complete') return 'Complete'
   return 'Visit'
@@ -131,6 +134,18 @@ export default function PatientConsultation() {
         treatment_plan: treatmentPlan,
       })
       if (status === 'completed') {
+        try {
+          const lines = buildVisitCharges({ visit: { ...appointment, status: 'completed' }, plans, prescriptions: profile?.prescriptions || [], labOrders: profile?.lab_orders || [] })
+          const existing = await DashboardService.getPayments({ customerId: appointment.patient_id })
+          if (!existing.some((item) => item.description.includes(`Visit:${appointment.id}`))) {
+            await DashboardService.createPayment({
+              customerId: appointment.patient_id,
+              amount: chargesTotal(lines),
+              status: 'pending',
+              description: chargesDescription(appointment.id, lines),
+            })
+          }
+        } catch { /* Billing still opens even if the pending payment could not be created. */ }
         navigate(`/dental-client/payments?patient=${encodeURIComponent(appointment.patient_id)}`)
         return
       }
@@ -197,7 +212,8 @@ export default function PatientConsultation() {
           {activeTab === 'Visit' && <VisitTab draft={draft} update={update} patient={patient} appointment={appointment} profile={profile} plans={plans} completed={completed} allergies={allergies} conditions={conditions} onComplete={() => setPendingAction('complete')} onPlans={() => setActiveTab('Treatment Plan')} onHistory={() => setActiveTab('Medical History')} onPrescriptionsAdded={(next) => setProfile(next)} />}
           {activeTab === 'Dental Chart' && <DentalChartPanel profile={profile} />}
           {activeTab === 'Treatment Plan' && <TreatmentPlanPanel profile={profile} plans={plans} onPlansChange={setPlans} />}
-          {activeTab === 'Imaging' && <ImagingTab profile={profile} onRefresh={async () => setProfile(await DashboardService.getPatientProfile(patient.id))} />}
+          {activeTab === 'Imaging' && <ImagingTab profile={profile} onDocuments={() => setActiveTab('Documents')} onRefresh={async () => setProfile(await DashboardService.getPatientProfile(patient.id))} />}
+          {activeTab === 'Documents' && <DocumentsPanel profile={profile} onUpdated={setProfile} />}
           {activeTab === 'Medical History' && <MedicalHistoryPanel profile={profile} onUpdated={setProfile} />}
           {activeTab === 'Complete' && <CompleteTab draft={draft} completed={completed} onComplete={() => setPendingAction('complete')} />}
         </div>
@@ -359,7 +375,7 @@ function PrescriptionCard({ profile, onUpdated }: { profile: PatientProfile; onU
   )
 }
 
-function ImagingTab({ profile, onRefresh }: { profile: PatientProfile; onRefresh: () => Promise<void> }) {
+function ImagingTab({ profile, onRefresh, onDocuments }: { profile: PatientProfile; onRefresh: () => Promise<void>; onDocuments: () => void }) {
   const [uploading, setUploading] = useState(false)
   const [notice, setNotice] = useState('')
   const upload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -386,7 +402,7 @@ function ImagingTab({ profile, onRefresh }: { profile: PatientProfile; onRefresh
   }
   return (
     <Card title="Imaging & radiographs" action={<label className="flex cursor-pointer items-center gap-1 text-xs font-medium text-sky-600"><Upload size={14} />{uploading ? 'Uploading…' : 'Upload'}<input type="file" accept=".pdf,.png,.jpg,.jpeg,.txt" onChange={upload} className="sr-only" /></label>}>
-      <p className="mb-3 text-xs text-slate-500">Store bitewings, OPG, and intraoral photos with this visit. Files also appear under Documents.</p>
+      <p className="mb-3 text-xs text-slate-500">Store bitewings, OPG, and intraoral photos with this visit. Files also appear under the <button type="button" onClick={onDocuments} className="font-medium text-sky-600 hover:underline">Documents</button> tab for this patient.</p>
       {notice && <p className="mb-3 text-xs text-sky-700">{notice}</p>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {profile.reports.map((report) => (

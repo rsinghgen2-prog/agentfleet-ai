@@ -55,7 +55,7 @@ export class SupportController {
       const clauses: string[] = []; const values: unknown[] = []
       if (date.data) { values.push(date.data); clauses.push(`c.updated_at >= $${values.length}::date AND c.updated_at < $${values.length}::date + INTERVAL '1 day'`) }
       if (status.data) { values.push(status.data); clauses.push(`c.status = $${values.length}`) }
-      const result = await pool.query(`SELECT c.id, c.subject, c.status, c.created_by, u.full_name AS requester_name, c.created_at, c.updated_at FROM ${s}.support_conversations c JOIN ${s}.users u ON u.id = c.created_by ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY c.updated_at DESC LIMIT 100`, values)
+      const result = await pool.query(`SELECT c.id, c.subject, c.status, c.created_by, u.full_name AS requester_name, c.created_at, c.updated_at, (SELECT m.body FROM ${s}.support_messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message FROM ${s}.support_conversations c JOIN ${s}.users u ON u.id = c.created_by ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY CASE WHEN c.status = 'open' THEN 0 ELSE 1 END, c.updated_at DESC LIMIT 100`, values)
       return res.json({ success: true, data: result.rows })
     } catch (error) { return sendError(res, error, 'Failed to fetch support conversations') }
   }

@@ -23,7 +23,7 @@ export interface InventoryCommunication { id: string; order_id: string; channel:
 export interface InventoryCommunicationInput { channel: 'email' | 'sms'; recipientType?: 'vendor' | 'patient' | 'client'; recipient?: string; subject?: string; body: string; copyToPatient?: boolean; patientId?: string | null }
 export interface SupportMessage { id: string; conversation_id: string; sender_id: string; sender_name?: string | null; sender_role: string; body: string; created_at: string }
 export interface SupportConversation { id: string; subject: string; status: 'open' | 'closed'; created_by?: string | null; created_at: string; updated_at: string }
-export interface SupportConversationSummary extends SupportConversation { requester_name?: string | null }
+export interface SupportConversationSummary extends SupportConversation { requester_name?: string | null; last_message?: string | null }
 export interface SupportChat { conversation: SupportConversation | null; messages: SupportMessage[] }
 export interface HospitalDirectory { id: string; name: string; relationship: 'own' | 'partner'; specialty: string; address: string; city: string; contact_name?: string; contact_phone?: string; is_active?: boolean }
 export interface NotificationAlert { id: string; kind: 'message' | 'email' | 'call'; title: string; body: string; customer_name?: string | null; is_read: boolean; created_at: string }
@@ -362,9 +362,29 @@ export class DashboardService {
   static async createDentistNote(input: DentistNoteInput): Promise<DentistNote> { try { return await this.request<DentistNote>('/api/v1/patients/notes', { method: 'POST', body: JSON.stringify(input) }) } catch (error) { if (!DEMO_MODE) throw error; const now = new Date().toISOString(); const note: DentistNote = { id: `demo-note-${Date.now()}`, title: input.title, content: input.content, expires_at: input.expiresAt || oneMonthFrom(), is_active: true, created_at: now, updated_at: now }; const next = [note, ...getDemoDentistNotes()]; writeDemoCollection(DEMO_DENTIST_NOTES_KEY, next); return note } }
   static async updateDentistNote(id: string, input: DentistNoteInput): Promise<DentistNote> { try { return await this.request<DentistNote>(`/api/v1/patients/notes/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }) } catch (error) { if (!DEMO_MODE) throw error; const current = getDemoDentistNotes(); const existing = current.find((note) => note.id === id); if (!existing) throw new Error('Dentist note not found'); const note = { ...existing, ...input, expires_at: input.expiresAt || oneMonthFrom(), is_active: true, updated_at: new Date().toISOString() }; writeDemoCollection(DEMO_DENTIST_NOTES_KEY, current.map((item) => item.id === id ? note : item)); return note } }
   static async deleteDentistNote(id: string): Promise<void> { try { await this.request<{ id: string }>(`/api/v1/patients/notes/${encodeURIComponent(id)}`, { method: 'DELETE' }) } catch (error) { if (!DEMO_MODE) throw error; const current = readDemoCollection<DentistNote>(DEMO_DENTIST_NOTES_KEY, []); if (!current.some((note) => note.id === id && note.is_active !== false)) throw new Error('Dentist note not found'); writeDemoCollection(DEMO_DENTIST_NOTES_KEY, current.map((note) => note.id === id ? { ...note, is_active: false, updated_at: new Date().toISOString() } : note)) } }
-  static async createBooking(bookingData: unknown) { try { return await this.request<{ patientId: string; appointmentId: string }>('/api/v1/patients/bookings', { method: 'POST', body: JSON.stringify(bookingData) }) } catch (error) { if (!DEMO_MODE) throw error; const input = bookingData as Record<string, string>; const timestamp = Date.now(); const patientId = `demo-patient-${timestamp}`; const appointmentId = `demo-appointment-${timestamp}`; const patient: Patient = { id: patientId, first_name: input.firstName, last_name: input.lastName, phone: input.phone, email: input.email, gender: input.gender, date_of_birth: input.dateOfBirth || undefined, last_visit: null, next_appointment: input.appointmentDate }; const appointment: Appointment = { id: appointmentId, patient_id: patientId, appointment_date: input.appointmentDate, appointment_time: input.appointmentTime, duration: 30, appointment_type: input.appointmentType, status: 'scheduled', reason: input.reason, notes: input.notes || '', first_name: patient.first_name, last_name: patient.last_name, phone: patient.phone || '', gender: patient.gender || '' }; writeDemoCollection(DEMO_PATIENTS_KEY, [...getDemoPatients(), patient]); writeDemoCollection(DEMO_APPOINTMENTS_KEY, [...getDemoAppointments(), appointment]); return { patientId, appointmentId } } }
+  static async createBooking(bookingData: unknown) { try { return await this.request<{ patientId: string; appointmentId: string }>('/api/v1/patients/bookings', { method: 'POST', body: JSON.stringify(bookingData) }) } catch (error) { if (!DEMO_MODE) throw error; const input = bookingData as Record<string, unknown>; const timestamp = Date.now(); const patientId = `demo-patient-${timestamp}`; const appointmentId = `demo-appointment-${timestamp}`; const patient: Patient = { id: patientId, first_name: String(input.firstName || ''), last_name: String(input.lastName || ''), phone: String(input.phone || ''), email: String(input.email || ''), gender: String(input.gender || ''), date_of_birth: input.dateOfBirth ? String(input.dateOfBirth) : undefined, last_visit: null, next_appointment: String(input.appointmentDate || '') }; const appointment: Appointment = { id: appointmentId, patient_id: patientId, appointment_date: String(input.appointmentDate || ''), appointment_time: String(input.appointmentTime || ''), duration: Number(input.duration) || 30, appointment_type: String(input.appointmentType || 'Checkup'), status: 'scheduled', reason: String(input.reason || ''), notes: String(input.notes || ''), first_name: patient.first_name, last_name: patient.last_name, phone: patient.phone || '', gender: patient.gender || '' }; writeDemoCollection(DEMO_PATIENTS_KEY, [...getDemoPatients(), patient]); writeDemoCollection(DEMO_APPOINTMENTS_KEY, [...getDemoAppointments(), appointment]); return { patientId, appointmentId } } }
   static async getSettings(): Promise<ClinicSettings | null> { try { return await this.request<ClinicSettings | null>('/api/v1/patients/settings') } catch (error) { if (!DEMO_MODE) throw error; try { return JSON.parse(localStorage.getItem('clinicSettingsDraft') || 'null') as ClinicSettings | null || mockSettings } catch { return mockSettings } } }
-  static async updateSettings(settings: Record<string, unknown>): Promise<ClinicSettings> { try { return await this.request<ClinicSettings>('/api/v1/patients/settings', { method: 'PUT', body: JSON.stringify(settings) }) } catch (error) { if (!DEMO_MODE) throw error; const current = await this.getSettings() || mockSettings; const next = { ...current, clinic_name: settings.clinicName || current.clinic_name, clinic_email: settings.clinicEmail || current.clinic_email, notifications: settings.notifications || current.notifications } as ClinicSettings; localStorage.setItem('clinicSettingsDraft', JSON.stringify(next)); return next } }
+  static async updateSettings(settings: Record<string, unknown>): Promise<ClinicSettings> {
+    try { return await this.request<ClinicSettings>('/api/v1/patients/settings', { method: 'PUT', body: JSON.stringify(settings) }) }
+    catch (error) {
+      if (!DEMO_MODE) throw error
+      const current = await this.getSettings() || mockSettings
+      const next: ClinicSettings = {
+        ...current,
+        clinic_name: String(settings.clinicName || current.clinic_name),
+        clinic_email: settings.clinicEmail === undefined ? current.clinic_email : String(settings.clinicEmail || ''),
+        phone: settings.phone === undefined ? current.phone : String(settings.phone || ''),
+        address: (settings.address as ClinicSettings['address']) || current.address,
+        branding: (settings.branding as ClinicSettings['branding']) || current.branding,
+        working_hours: (settings.workingHours as ClinicSettings['working_hours']) || current.working_hours,
+        appointment_settings: (settings.appointmentSettings as ClinicSettings['appointment_settings']) || current.appointment_settings,
+        notifications: (settings.notifications as ClinicSettings['notifications']) || current.notifications,
+        timezone: String(settings.timezone || current.timezone),
+      }
+      localStorage.setItem('clinicSettingsDraft', JSON.stringify(next))
+      return next
+    }
+  }
   static async getHospitalDirectory(search = ''): Promise<HospitalDirectory[]> { try { return await this.request<HospitalDirectory[]>(`/api/v1/patients/hospitals?search=${encodeURIComponent(search)}`) } catch (error) { if (!DEMO_MODE) throw error; const needle = search.trim().toLowerCase(); return mockHospitals.filter((hospital) => `${hospital.name} ${hospital.relationship} ${hospital.specialty} ${hospital.city}`.toLowerCase().includes(needle)) } }
   static async getClientAlerts(unreadOnly = false): Promise<NotificationAlert[]> { try { return await this.request<NotificationAlert[]>(`/api/v1/patients/notifications?unreadOnly=${unreadOnly}`) } catch (error) { if (!DEMO_MODE) throw error; return getDemoAlerts().filter((alert) => !unreadOnly || !alert.is_read) } }
   static async markClientAlertRead(id: string): Promise<void> { try { await this.request<{ id: string }>(`/api/v1/patients/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH' }) } catch (error) { if (!DEMO_MODE) throw error; const alerts = getDemoAlerts(); writeDemoCollection(DEMO_CLIENT_ALERTS_KEY, alerts.map((alert) => alert.id === id ? { ...alert, is_read: true } : alert)) } }
@@ -384,10 +404,59 @@ export class DashboardService {
   static async sendInventoryOrderCommunication(orderId: string, input: InventoryCommunicationInput): Promise<InventoryCommunication[]> { try { return await this.request<InventoryCommunication[]>(`/api/v1/patients/inventory/orders/${encodeURIComponent(orderId)}/communications`, { method: 'POST', body: JSON.stringify(input) }) } catch (error) { if (!DEMO_MODE) throw error; const orders = getDemoInventoryOrders(); const order = orders.find((item) => item.id === orderId); if (!order) throw new Error('Inventory order not found'); const vendor = order.vendor_id ? getDemoInventoryVendors().find((item) => item.id === order.vendor_id) : undefined; const patient = getDemoPatients().find((item) => item.id === (input.patientId || order.patient_id)); const patientRecipient = input.channel === 'email' ? patient?.email : patient?.phone; const now = new Date().toISOString(); const recipient = input.recipient || (input.recipientType === 'patient' || input.recipientType === 'client' ? patientRecipient : input.channel === 'email' ? vendor?.email : vendor?.phone); if (!recipient) throw new Error(input.recipientType === 'patient' || input.recipientType === 'client' ? 'Patient contact is required' : 'Vendor contact is required'); const records: InventoryCommunication[] = [{ id: `demo-communication-${Date.now()}`, order_id: orderId, channel: input.channel, recipient_type: input.recipientType || 'vendor', recipient, subject: input.subject || 'Inventory purchase order', body: input.body, status: 'queued', sent_at: null, created_at: now }]; if (input.copyToPatient) { if (!patientRecipient) throw new Error('Patient contact is required for a copy'); records.push({ ...records[0], id: `demo-communication-${Date.now()}-patient`, recipient_type: 'patient', recipient: patientRecipient, created_at: now }) } order.communications = [...records, ...order.communications]; order.updated_at = now; writeDemoCollection(DEMO_INVENTORY_ORDERS_KEY, orders); return records } }
   static async reorderInventoryOrder(orderId: string): Promise<InventoryOrder> { try { return await this.request<InventoryOrder>(`/api/v1/patients/inventory/orders/${encodeURIComponent(orderId)}/reorder`, { method: 'POST' }) } catch (error) { if (!DEMO_MODE) throw error; const source = getDemoInventoryOrders().find((order) => order.id === orderId && order.status !== 'draft'); if (!source) throw new Error('Historical inventory order not found'); const now = new Date().toISOString(); const order: InventoryOrder = { ...source, id: `demo-order-${Date.now()}`, order_number: `PO-REORDER-${String(Date.now()).slice(-10)}`, status: 'draft', payment_status: 'pending', payment_method: null, notes: `Reordered from ${source.order_number}. ${source.notes}`.trim(), placed_at: null, created_at: now, updated_at: now, items: source.items.map((item, index) => ({ ...item, id: `demo-order-item-${Date.now()}-${index}` })), events: [], communications: [] }; writeDemoCollection(DEMO_INVENTORY_ORDERS_KEY, [order, ...getDemoInventoryOrders()]); return order } }
   static async getSupportChat(): Promise<SupportChat | null> { try { return await this.request<SupportChat | null>('/api/v1/patients/support/chat') } catch (error) { if (!DEMO_MODE) throw error; return readDemoCollection<SupportChat>(DEMO_SUPPORT_CHAT_KEY, [])[0] || null } }
-  static async getSupportConversations(options: { date?: string; status?: 'open' | 'closed' } = {}): Promise<SupportConversationSummary[]> { try { const query = new URLSearchParams(); if (options.date) query.set('date', options.date); if (options.status) query.set('status', options.status); return await this.request<SupportConversationSummary[]>(`/api/v1/patients/support/conversations${query.size ? `?${query}` : ''}`) } catch (error) { if (!DEMO_MODE) throw error; const chats = readDemoCollection<SupportChat>(DEMO_SUPPORT_CHAT_KEY, []); return chats.filter((chat) => chat.conversation).map((chat) => ({ ...chat.conversation!, requester_name: 'Demo patient' })) } }
-  static async updateSupportConversationStatus(id: string, status: 'open' | 'closed'): Promise<SupportConversation> { return this.request<SupportConversation>(`/api/v1/patients/support/conversations/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) }) }
+  static async getSupportConversations(options: { date?: string; status?: 'open' | 'closed' } = {}): Promise<SupportConversationSummary[]> {
+    try {
+      const query = new URLSearchParams()
+      if (options.date) query.set('date', options.date)
+      if (options.status) query.set('status', options.status)
+      return await this.request<SupportConversationSummary[]>(`/api/v1/patients/support/conversations${query.size ? `?${query}` : ''}`)
+    } catch (error) {
+      if (!DEMO_MODE) throw error
+      return readDemoCollection<SupportChat>(DEMO_SUPPORT_CHAT_KEY, [])
+        .filter((chat) => {
+          const conversation = chat.conversation
+          if (!conversation) return false
+          if (options.status && conversation.status !== options.status) return false
+          if (options.date && !conversation.updated_at.startsWith(options.date)) return false
+          return true
+        })
+        .sort((a, b) => {
+          const openDelta = Number(b.conversation?.status === 'open') - Number(a.conversation?.status === 'open')
+          if (openDelta) return openDelta
+          return (b.conversation?.updated_at || '').localeCompare(a.conversation?.updated_at || '')
+        })
+        .map((chat) => {
+          const last = chat.messages[chat.messages.length - 1]
+          const subject = chat.conversation!.subject
+          const named = subject.includes(' · ') ? subject.split(' · ')[0] : subject
+          return { ...chat.conversation!, requester_name: named || 'Clinic thread', last_message: last?.body || null }
+        })
+    }
+  }
+  static async updateSupportConversationStatus(id: string, status: 'open' | 'closed'): Promise<SupportConversation> {
+    try { return await this.request<SupportConversation>(`/api/v1/patients/support/conversations/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) }) }
+    catch (error) {
+      if (!DEMO_MODE) throw error
+      const chats = readDemoCollection<SupportChat>(DEMO_SUPPORT_CHAT_KEY, [])
+      const chat = chats.find((item) => item.conversation?.id === id)
+      if (!chat?.conversation) throw new Error('Support conversation not found')
+      chat.conversation = { ...chat.conversation, status, updated_at: new Date().toISOString() }
+      writeDemoCollection(DEMO_SUPPORT_CHAT_KEY, chats)
+      return chat.conversation
+    }
+  }
   static async getSupportConversation(id: string): Promise<SupportChat> { try { return await this.request<SupportChat>(`/api/v1/patients/support/conversations/${encodeURIComponent(id)}`) } catch (error) { if (!DEMO_MODE) throw error; const chat = readDemoCollection<SupportChat>(DEMO_SUPPORT_CHAT_KEY, []).find((item) => item.conversation?.id === id); if (!chat) throw new Error('Support conversation not found'); return chat } }
-  static async createSupportConversation(subject = 'Hospital support'): Promise<SupportChat> { try { return await this.request<SupportChat>('/api/v1/patients/support/conversations', { method: 'POST', body: JSON.stringify({ subject }) }) } catch (error) { if (!DEMO_MODE) throw error; const now = new Date().toISOString(); const chat: SupportChat = { conversation: { id: `demo-support-${Date.now()}`, subject, status: 'open', created_by: 'demo-user', created_at: now, updated_at: now }, messages: [] }; writeDemoCollection(DEMO_SUPPORT_CHAT_KEY, [chat]); return chat } }
+  static async createSupportConversation(subject = 'Hospital support'): Promise<SupportChat> {
+    try { return await this.request<SupportChat>('/api/v1/patients/support/conversations', { method: 'POST', body: JSON.stringify({ subject }) }) }
+    catch (error) {
+      if (!DEMO_MODE) throw error
+      const now = new Date().toISOString()
+      const chat: SupportChat = { conversation: { id: `demo-support-${Date.now()}`, subject, status: 'open', created_by: 'demo-user', created_at: now, updated_at: now }, messages: [] }
+      const chats = readDemoCollection<SupportChat>(DEMO_SUPPORT_CHAT_KEY, []).filter((item) => item.conversation?.id !== chat.conversation?.id)
+      writeDemoCollection(DEMO_SUPPORT_CHAT_KEY, [chat, ...chats])
+      return chat
+    }
+  }
   static async sendSupportMessage(conversationId: string, body: string): Promise<SupportMessage> { try { return await this.request<SupportMessage>(`/api/v1/patients/support/conversations/${encodeURIComponent(conversationId)}/messages`, { method: 'POST', body: JSON.stringify({ body }) }) } catch (error) { if (!DEMO_MODE) throw error; const chats = readDemoCollection<SupportChat>(DEMO_SUPPORT_CHAT_KEY, []); const chat = chats.find((item) => item.conversation?.id === conversationId); if (!chat || !chat.conversation) throw new Error('Support conversation not found'); const message: SupportMessage = { id: `demo-support-message-${Date.now()}`, conversation_id: conversationId, sender_id: 'demo-user', sender_name: 'You', sender_role: 'client', body, created_at: new Date().toISOString() }; chat.messages = [...chat.messages, message]; chat.conversation.updated_at = message.created_at; writeDemoCollection(DEMO_SUPPORT_CHAT_KEY, chats); return message } }
 
   static async getPayments(options: { search?: string; status?: PaymentStatus; customerId?: string } = {}): Promise<Payment[]> {

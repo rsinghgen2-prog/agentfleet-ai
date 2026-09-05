@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { BadgeCheck, Download, FileText, Plus, RefreshCw, Search, ShieldCheck, WalletCards, X } from 'lucide-react'
+import { Download, FileText, Plus, RefreshCw, Search, ShieldCheck, WalletCards, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
-import { DashboardService, type Appointment, type Patient, type Payment, type PaymentInput, type PaymentMethod, type PaymentStatus, type PaymentSummary, type TreatmentPlan } from '../services/dashboardService'
+import { DashboardService, type Appointment, type Patient, type PatientProfile, type Payment, type PaymentInput, type PaymentMethod, type PaymentStatus, type PaymentSummary, type TreatmentPlan } from '../services/dashboardService'
 import { useDentalDashboardData } from '../hooks/useDentalDashboardData'
 import { describeApiError } from '../utils/apiError'
 import { ClinicDataStatus } from '../components/dental/ClinicDataStatus'
 import { appointmentDateKey, localDateKey, patientDisplayName, patientInitials, sortClinicVisits } from '../utils/clinicSchedule'
+import { buildVisitCharges, chargeKindLabel, chargesDescription, chargesTotal, type ChargeKind } from '../utils/visitCharges'
 
 const statuses: PaymentStatus[] = ['pending', 'paid', 'failed', 'refunded']
-const methods: PaymentMethod[] = ['cash', 'cheque', 'online', 'bank_transfer', 'card', 'upi']
+const methods: PaymentMethod[] = ['cash', 'upi', 'card', 'online', 'bank_transfer', 'cheque']
+const methodLabel: Record<PaymentMethod, string> = { cash: 'Cash', upi: 'UPI', card: 'Credit / Debit card', online: 'Online', bank_transfer: 'Bank transfer', cheque: 'Cheque' }
+const quickMethods: PaymentMethod[] = ['cash', 'upi', 'card']
 const money = (amount: number, currency = 'INR') => `${currency === 'INR' ? '₹' : `${currency} `}${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const dateLabel = (value?: string | null) => value ? new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 const titleCase = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
@@ -55,6 +58,7 @@ export default function DentalClientPayments() {
   const [patients, setPatients] = useState<Patient[]>([])
   const [visits, setVisits] = useState<Appointment[]>([])
   const [plans, setPlans] = useState<TreatmentPlan[]>([])
+  const [profile, setProfile] = useState<PatientProfile | null>(null)
   const [summary, setSummary] = useState<PaymentSummary | null>(null)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'all'>('all')
@@ -71,12 +75,12 @@ export default function DentalClientPayments() {
     setLoading(true)
     setError(null)
     try {
-      const today = localDateKey()
       const from = new Date(); from.setDate(from.getDate() - 14)
+      const to = new Date(); to.setDate(to.getDate() + 7)
       const [paymentList, patientResult, appointmentList] = await Promise.all([
         DashboardService.getPayments({ status: statusFilter === 'all' ? undefined : statusFilter }),
         DashboardService.getPatients('', 200),
-        DashboardService.getAppointments(localDateKey(from), today),
+        DashboardService.getAppointments(localDateKey(from), localDateKey(to)),
       ])
       setPayments(paymentList)
       setPatients(patientResult.data)
@@ -102,8 +106,14 @@ export default function DentalClientPayments() {
   }, [dueVisits, patients, selectedId, setParams])
 
   useEffect(() => {
-    if (!selectedId) { setPlans([]); return }
-    void DashboardService.getTreatmentPlans(selectedId).then(setPlans).catch(() => setPlans([]))
+    if (!selectedId) { setPlans([]); setProfile(null); return }
+    void Promise.all([
+      DashboardService.getTreatmentPlans(selectedId).catch(() => [] as TreatmentPlan[]),
+      DashboardService.getPatientProfile(selectedId).catch(() => null),
+    ]).then(([nextPlans, nextProfile]) => {
+      setPlans(nextPlans)
+      setProfile(nextProfile)
+    })
   }, [selectedId])
 
   const choose = (id: string) => {
@@ -112,10 +122,11 @@ export default function DentalClientPayments() {
     setParams((current) => { const nextParams = new URLSearchParams(current); nextParams.set('patient', id); return nextParams }, { replace: true })
   }
 
-  const selectedPatient = patients.find((item) => item.id === selectedId)
-  const selectedVisit = dueVisits.find((item) => item.patient_id === selectedId)
+  const selectedPatient = patients.find((item) => item.id === selectedId) || profile?.patient
+  const selectedVisit = dueVisits.find((item) => item.patient_id === selectedId) || visits.find((item) => item.patient_id === selectedId && item.status === 'completed')
   const selectedName = patientDisplayName(selectedPatient || selectedVisit)
-  const planned = plans.filter((plan) => !['cancelled', 'completed'].includes(plan.status)).reduce((total, plan) => total + Number(plan.estimated_cost || 0), 0)
+  const charges = useMemo(() => buildVisitCharges({ visit: selectedVisit, plans, prescriptions: profile?.prescriptions, labOrders: profile?.lab_orders }), [selectedVisit, plans, profile])
+  const planned = chargesTotal(charges)
   const collected = sumPayments(payments, selectedId, 'paid')
   const pending = sumPayments(payments, selectedId, 'pending')
   const due = Math.max(0, planned - collected)
@@ -127,14 +138,15 @@ export default function DentalClientPayments() {
     return `${payment.payment_number} ${nameOf(payment.customer_id)} ${payment.customer_id} ${payment.description}`.toLowerCase().includes(needle)
   })
 
-  const openCollect = (patientId: string, amount?: number, description?: string) => {
-    setDraft({ customerId: patientId, amount: amount && amount > 0 ? String(amount) : '', status: 'paid', method: 'cash', description: description || '' })
+  const openCollect = (patientId: string, amount?: number, description?: string, method: PaymentMethod = 'cash') => {
+    setDraft({ customerId: patientId, amount: amount && amount > 0 ? String(amount) : '', status: 'paid', method, description: description || (selectedVisit ? chargesDescription(selectedVisit.id, charges) : charges.map((line) => line.label).join('\n')) })
     setModal(true)
   }
 
   const createPayment = async (event: FormEvent) => {
     event.preventDefault()
     if (!draft.customerId) { setError('Select a patient'); return }
+    if (draft.status === 'paid' && !draft.method) { setError('Choose how this payment was collected (UPI, cash, card, or another method).'); return }
     setBusy(true); setError(null)
     try {
       const input: PaymentInput = { customerId: draft.customerId, amount: Number(draft.amount) || 0, status: draft.status, method: draft.method || null, description: draft.description }
@@ -155,9 +167,9 @@ export default function DentalClientPayments() {
       <div>
         <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.25em] text-[#3578e5]"><WalletCards size={16} /> Billing &amp; payments</div>
         <h1 className="text-2xl font-black tracking-tight sm:text-4xl">Collect after consultation</h1>
-        <p className="mt-2 max-w-2xl text-sm text-[#637085]">Default view is the patient whose visit was just completed. Search to collect or review payment for anyone else.</p>
+        <p className="mt-2 max-w-2xl text-sm text-[#637085]">When a visit is marked complete, that patient opens here with treatment plan, medicines, and tests. Doctor, accounts, or any clinic user can collect by UPI, cash, or card.</p>
       </div>
-      <button type="button" onClick={() => openCollect(selectedId || '', due, selectedVisit ? `Payment for ${visitNote}` : 'Clinic payment')} className={`${buttonClass} flex items-center justify-center gap-2 bg-[#3578e5] px-5 py-3 text-white shadow-lg`}><Plus size={17} /> Collect payment</button>
+      <button type="button" onClick={() => openCollect(selectedId || '', due || planned, selectedVisit ? chargesDescription(selectedVisit.id, charges) : charges.map((line) => line.label).join('\n'))} className={`${buttonClass} flex items-center justify-center gap-2 bg-[#3578e5] px-5 py-3 text-white shadow-lg`}><Plus size={17} /> Collect payment</button>
     </header>
 
     {isAdmin && <AdminReport summary={summary} onDownload={download} busy={busy} />}
@@ -185,22 +197,31 @@ export default function DentalClientPayments() {
 
       <section className="rounded-[26px] border border-white bg-white/90 p-5 shadow-sm">
         {selectedId ? (
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#3578e5]">Current patient</p>
-              <h2 className="mt-1 text-2xl font-black">{selectedName}</h2>
-              <p className="mt-1 text-sm text-[#637085]">{visitNote}</p>
-              <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                <span className="rounded-2xl bg-[#e5f8ef] px-3 py-2 font-bold text-[#168052]">Collected {money(collected)}</span>
-                <span className="rounded-2xl bg-[#fff5df] px-3 py-2 font-bold text-[#ad7400]">Pending {money(pending)}</span>
-                <span className="rounded-2xl bg-[#e9f1ff] px-3 py-2 font-bold text-[#2864c7]">Plan estimate {money(planned)}</span>
+          <div className="space-y-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-[#3578e5]">Current patient</p>
+                <h2 className="mt-1 text-2xl font-black">{selectedName}</h2>
+                <p className="mt-1 text-sm text-[#637085]">{visitNote}</p>
+                <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                  <span className="rounded-2xl bg-[#e5f8ef] px-3 py-2 font-bold text-[#168052]">Collected {money(collected)}</span>
+                  <span className="rounded-2xl bg-[#fff5df] px-3 py-2 font-bold text-[#ad7400]">Pending {money(pending)}</span>
+                  <span className="rounded-2xl bg-[#e9f1ff] px-3 py-2 font-bold text-[#2864c7]">Charges {money(planned)}</span>
+                </div>
+              </div>
+              <div className="rounded-2xl bg-[#f8faff] p-4 lg:min-w-[240px]">
+                <p className="text-xs font-bold text-[#637085]">Amount due</p>
+                <p className="mt-1 text-3xl font-black text-[#172033]">{money(due)}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {quickMethods.map((method) => (
+                    <button type="button" key={method} onClick={() => openCollect(selectedId, due || planned, selectedVisit ? chargesDescription(selectedVisit.id, charges) : charges.map((line) => line.label).join('\n'), method)} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#2864c7] shadow-sm">{methodLabel[method]}</button>
+                  ))}
+                </div>
+                <button type="button" onClick={() => openCollect(selectedId, due || planned, selectedVisit ? chargesDescription(selectedVisit.id, charges) : charges.map((line) => line.label).join('\n'))} className={`${buttonClass} mt-4 w-full bg-[#3578e5] text-white`}>Take payment</button>
+                <p className="mt-2 text-[11px] leading-4 text-[#8793a5]">Doctor, accounts, and clinic staff can complete this collection.</p>
               </div>
             </div>
-            <div className="rounded-2xl bg-[#f8faff] p-4 lg:min-w-[240px]">
-              <p className="text-xs font-bold text-[#637085]">Amount due</p>
-              <p className="mt-1 text-3xl font-black text-[#172033]">{money(due)}</p>
-              <button type="button" onClick={() => openCollect(selectedId, due || planned, selectedVisit ? `Payment for ${visitNote}` : 'Clinic payment')} className={`${buttonClass} mt-4 w-full bg-[#3578e5] text-white`}>Take payment</button>
-            </div>
+            <ChargeSheet lines={charges} />
           </div>
         ) : <p className="text-sm text-[#637085]">Select a completed visit, or search for another patient.</p>}
       </section>
@@ -230,7 +251,7 @@ export default function DentalClientPayments() {
     {notice && <div className="mb-5 flex justify-between rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">{notice}<button type="button" onClick={() => setNotice(null)}><X size={17} /></button></div>}
 
     {loading ? <div className="rounded-[26px] bg-white/80 py-20 text-center text-sm text-[#637085]"><RefreshCw className="mx-auto mb-3 animate-spin text-[#3578e5]" />Loading payments…</div>
-      : <PaymentTable payments={visiblePayments} nameOf={nameOf} onStatus={changeStatus} busy={busy} isAdmin={isAdmin} emptyText={needle ? 'No payments match that search.' : 'No payments for this patient yet. Collect payment above.'} />}
+      : <PaymentTable payments={visiblePayments} nameOf={nameOf} onStatus={changeStatus} busy={busy} emptyText={needle ? 'No payments match that search.' : 'No payments for this patient yet. Collect payment above.'} />}
   </div>
   {modal && <Modal title="Collect payment" close={() => setModal(false)}><form onSubmit={createPayment}><div className="grid gap-4 sm:grid-cols-2">
     <Field label="Patient" required className="sm:col-span-2">
@@ -241,8 +262,15 @@ export default function DentalClientPayments() {
     </Field>
     <Field label="Amount (₹)" required><input required min="0" step="0.01" type="number" value={draft.amount} onChange={(event) => setDraft({ ...draft, amount: event.target.value })} className={inputClass} /></Field>
     <Field label="Status"><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as PaymentStatus })} className={inputClass}>{statuses.map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}</select></Field>
-    <Field label="Method"><select value={draft.method} onChange={(event) => setDraft({ ...draft, method: event.target.value as PaymentMethod | '' })} className={inputClass}><option value="">Not selected</option>{methods.map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}</select></Field>
-    <Field label="Description" className="sm:col-span-2"><textarea rows={3} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className={`${inputClass} h-auto py-3`} placeholder="Visit, treatment, or note…" /></Field>
+    <Field label="Method" required className="sm:col-span-2">
+      <div className="mt-2 mb-2 flex flex-wrap gap-2">
+        {quickMethods.map((method) => (
+          <button type="button" key={method} onClick={() => setDraft({ ...draft, method })} className={`rounded-full px-3 py-2 text-xs font-black ${draft.method === method ? 'bg-[#3578e5] text-white' : 'bg-[#e9f1ff] text-[#2864c7]'}`}>{methodLabel[method]}</button>
+        ))}
+      </div>
+      <select required={draft.status === 'paid'} value={draft.method} onChange={(event) => setDraft({ ...draft, method: event.target.value as PaymentMethod | '' })} className={inputClass}><option value="">Not selected</option>{methods.map((value) => <option key={value} value={value}>{methodLabel[value]}</option>)}</select>
+    </Field>
+    <Field label="Description" className="sm:col-span-2"><textarea rows={4} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className={`${inputClass} h-auto py-3`} placeholder="Visit, treatment plan, medicine, or lab test…" /></Field>
   </div><div className="mt-6 flex justify-end border-t border-[#e2e8f1] pt-5"><button disabled={busy} className={`${buttonClass} bg-[#3578e5] text-white`}>{busy ? 'Saving…' : 'Record payment'}</button></div></form></Modal>}
   </div>
 }
@@ -265,7 +293,28 @@ function AdminReport({ summary, onDownload, busy }: { summary: PaymentSummary | 
   </section>
 }
 
-function PaymentTable({ payments, nameOf, onStatus, busy, isAdmin, emptyText }: { payments: Payment[]; nameOf: (id: string) => string; onStatus: (payment: Payment, status: PaymentStatus) => void; busy: boolean; isAdmin: boolean; emptyText: string }) {
+function ChargeSheet({ lines }: { lines: ReturnType<typeof buildVisitCharges> }) {
+  if (!lines.length) return <p className="rounded-2xl bg-[#f8faff] p-4 text-sm text-[#637085]">No visit, treatment plan, medicine, or lab test is attached yet.</p>
+  return (
+    <div>
+      <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-[#8793a5]">Visit charges</p>
+      <div className="overflow-hidden rounded-2xl border border-[#eef2f8]">
+        {lines.map((line) => (
+          <div key={`${line.kind}-${line.id}`} className="flex items-start justify-between gap-3 border-b border-[#eef2f8] px-4 py-3 last:border-0">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wider text-[#8793a5]">{chargeKindLabel[line.kind as ChargeKind]}</p>
+              <p className="truncate text-sm font-bold text-[#172033]">{line.label}</p>
+              {line.detail && <p className="mt-0.5 text-[11px] text-[#8793a5]">{line.detail}</p>}
+            </div>
+            <p className="shrink-0 text-sm font-black text-[#172033]">{line.amount ? money(line.amount) : 'At collection'}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PaymentTable({ payments, nameOf, onStatus, busy, emptyText }: { payments: Payment[]; nameOf: (id: string) => string; onStatus: (payment: Payment, status: PaymentStatus) => void; busy: boolean; emptyText: string }) {
   if (!payments.length) return <div className="rounded-[26px] border border-white bg-white/80 p-8 text-sm text-[#637085]">{emptyText}</div>
   return <div className="overflow-hidden rounded-[26px] border border-white bg-white shadow-sm">
     <div className="hidden grid-cols-[1.2fr_1.4fr_1fr_0.8fr_0.9fr_1fr] gap-3 border-b border-[#eef2f8] bg-[#f8faff] px-5 py-3 text-[10px] font-black uppercase tracking-wider text-[#8793a5] lg:grid"><span>Payment ID</span><span>Customer / Customer ID</span><span>Amount</span><span>Status</span><span>Date</span><span>Method</span></div>
@@ -273,9 +322,9 @@ function PaymentTable({ payments, nameOf, onStatus, busy, isAdmin, emptyText }: 
       <div><p className="font-black">{payment.payment_number}</p><p className="text-[11px] text-[#8793a5] lg:hidden">{nameOf(payment.customer_id)}</p></div>
       <div><p className="font-bold">{nameOf(payment.customer_id)}</p><p className="font-mono text-[11px] text-[#8793a5]">{payment.customer_id}</p></div>
       <div className="font-black text-[#172033]">{money(payment.amount, payment.currency)}</div>
-      <div>{isAdmin ? <select disabled={busy} value={payment.status} onChange={(event) => onStatus(payment, event.target.value as PaymentStatus)} className={`rounded-full px-2.5 py-1 text-[11px] font-black ${statusTone[payment.status]}`}>{statuses.map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}</select> : <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black ${statusTone[payment.status]}`}>{payment.status === 'paid' && <BadgeCheck size={13} />}{titleCase(payment.status)}</span>}</div>
+      <div><select disabled={busy} value={payment.status} onChange={(event) => onStatus(payment, event.target.value as PaymentStatus)} className={`rounded-full px-2.5 py-1 text-[11px] font-black ${statusTone[payment.status]}`}>{statuses.map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}</select></div>
       <div className="text-[#637085]">{dateLabel(payment.paid_at || payment.created_at)}</div>
-      <div className="text-[#637085]">{payment.method ? titleCase(payment.method) : '—'}</div>
+      <div className="text-[#637085]">{payment.method ? methodLabel[payment.method] : '—'}</div>
     </div>)}</div>
   </div>
 }
