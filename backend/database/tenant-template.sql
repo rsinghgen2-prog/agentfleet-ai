@@ -253,6 +253,8 @@ CREATE TABLE IF NOT EXISTS lab_order_dispatches (
 
 CREATE INDEX IF NOT EXISTS idx_patients_active_name ON patients (is_active, last_name, first_name);
 CREATE INDEX IF NOT EXISTS idx_patients_search_phone ON patients (phone);
+CREATE UNIQUE INDEX IF NOT EXISTS patients_active_email_unique ON patients (lower(email)) WHERE is_active AND email IS NOT NULL AND btrim(email) <> '';
+CREATE UNIQUE INDEX IF NOT EXISTS patients_active_phone_digits_unique ON patients (regexp_replace(phone, '[^0-9]', '', 'g')) WHERE is_active AND phone IS NOT NULL AND regexp_replace(phone, '[^0-9]', '', 'g') <> '';
 CREATE INDEX IF NOT EXISTS idx_appointments_date_status ON appointments (appointment_date, status);
 CREATE INDEX IF NOT EXISTS idx_appointments_patient ON appointments (patient_id, appointment_date DESC);
 CREATE INDEX IF NOT EXISTS idx_inventory_active_category ON inventory_items (is_active, category);

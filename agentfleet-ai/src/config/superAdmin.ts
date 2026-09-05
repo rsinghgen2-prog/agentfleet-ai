@@ -1,7 +1,7 @@
 // Super Admin Configuration
 export const SUPER_ADMIN = {
   email: 'rsingh.gen2@gmail.com',
-  password: 'Aug@2026',
+  password: import.meta.env.VITE_SUPER_ADMIN_PASSWORD || '',
   fullName: 'Super Administrator',
   phone: '+1 (000) 000-0000',
   businessName: 'AgentFleet AI',
@@ -32,6 +32,7 @@ export const isSuperAdmin = (email: string): boolean => {
 
 // Validate super admin credentials
 export const validateSuperAdmin = (email: string, password: string): boolean => {
+  if (!SUPER_ADMIN.password) return false
   return (
     email.toLowerCase() === SUPER_ADMIN.email.toLowerCase() &&
     password === SUPER_ADMIN.password

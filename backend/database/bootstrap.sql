@@ -20,3 +20,4 @@ CREATE SCHEMA IF NOT EXISTS tenant_abc_dental;
 SET search_path TO tenant_abc_dental, public;
 \i /opt/agentfleet-database/02-tenant-template.sql
 \i /opt/agentfleet-database/03-seed-data.sql
+\i /opt/agentfleet-database/04-seed-test-bookings.sql

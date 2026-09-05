@@ -16,6 +16,7 @@ services:
       - ./database/schema.sql:/opt/agentfleet-database/01-platform-schema.sql:ro
       - ./database/tenant-template.sql:/opt/agentfleet-database/02-tenant-template.sql:ro
       - ./database/seed-data-v2.sql:/opt/agentfleet-database/03-seed-data.sql:ro
+      - ./database/seed-test-bookings.sql:/opt/agentfleet-database/04-seed-test-bookings.sql:ro
     networks: [agentfleet-network]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d agentfleet"]
@@ -48,7 +49,7 @@ services:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/agentfleet
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in .env}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://127.0.0.1:5173}
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,7 +68,7 @@ services:
       PORT: 3010
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/agentfleet
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://127.0.0.1:5173}
     depends_on:
       postgres:
         condition: service_healthy

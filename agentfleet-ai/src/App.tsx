@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useSearchParams } from 'react-router-dom'
 import { LanguageProvider } from './context/LanguageContext'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
@@ -14,7 +14,6 @@ import EnhancedDashboard from './pages/EnhancedDashboard'
 import DentalDashboard from './pages/DentalDashboard'
 import IndustryDashboard from './pages/IndustryDashboard'
 import AdminDashboard from './pages/AdminDashboard'
-import DentalClientOverview from './pages/DentalClientOverview'
 import DentalClientStitchDashboard from './pages/DentalClientStitchDashboard'
 import DentalClientPatients from './pages/DentalClientPatients'
 import PatientProfile from './pages/PatientProfile'
@@ -46,6 +45,45 @@ const ProtectedRoute = ({ children, allowedUserTypes }: { children: React.ReactN
   }
 
   return <>{children}</>
+}
+
+function LegacyCustomerOverviewRedirect() {
+  const [params] = useSearchParams()
+  const patient = params.get('patient')
+  return <Navigate to={patient ? `/dental-client/patients?patient=${encodeURIComponent(patient)}` : '/dental-client/patients'} replace />
+}
+
+function LegacyDentalChartRedirect() {
+  const [params] = useSearchParams()
+  const patient = params.get('patient')
+  const appointment = params.get('appointment')
+  const query = new URLSearchParams()
+  if (appointment) query.set('appointment', appointment)
+  if (patient) query.set('patient', patient)
+  query.set('tab', 'chart')
+  return <Navigate to={patient || appointment ? `/dental-client/consultation?${query.toString()}` : '/dental-client/patients'} replace />
+}
+
+function LegacyMedicalHistoryRedirect() {
+  const [params] = useSearchParams()
+  const patient = params.get('patient')
+  const appointment = params.get('appointment')
+  const query = new URLSearchParams()
+  if (appointment) query.set('appointment', appointment)
+  if (patient) query.set('patient', patient)
+  query.set('tab', 'history')
+  return <Navigate to={patient || appointment ? `/dental-client/consultation?${query.toString()}` : '/dental-client/patients'} replace />
+}
+
+function LegacyTreatmentPlanRedirect() {
+  const [params] = useSearchParams()
+  const patient = params.get('patient')
+  const appointment = params.get('appointment')
+  const query = new URLSearchParams()
+  if (appointment) query.set('appointment', appointment)
+  if (patient) query.set('patient', patient)
+  query.set('tab', 'plan')
+  return <Navigate to={patient || appointment ? `/dental-client/consultation?${query.toString()}` : '/dental-client/patients'} replace />
 }
 
 function App() {
@@ -100,7 +138,7 @@ function App() {
             <Route path="/dental-client" element={<ProtectedRoute allowedUserTypes={['client']}><DentalClientShell /></ProtectedRoute>}>
               <Route index element={<DentalClientStitchDashboard />} />
               <Route path="dashboard" element={<DentalClientStitchDashboard />} />
-              <Route path="customers-overview" element={<DentalClientOverview />} />
+              <Route path="customers-overview" element={<LegacyCustomerOverviewRedirect />} />
               <Route path="patients" element={<DentalClientPatients />} />
               <Route path="patients/:id" element={<PatientProfile />} />
               <Route path="customers" element={<CustomerDetails />} />
@@ -109,10 +147,12 @@ function App() {
               <Route path="inventory" element={<DentalClientInventory />} />
               <Route path="payments" element={<DentalClientPayments />} />
               <Route path="settings" element={<DentalClientSettings />} />
+              <Route path="consultation" element={<PatientConsultation />} />
               <Route path="client-consulation" element={<PatientConsultation />} />
-              <Route path="dental-chart" element={<ClinicalWorkspace kind="chart" />} />
-              <Route path="treatment-plan" element={<ClinicalWorkspace kind="treatment" />} />
-              <Route path="medical-history" element={<ClinicalWorkspace kind="history" />} />
+              <Route path="clinical-notes" element={<ClinicalWorkspace kind="notes" />} />
+              <Route path="dental-chart" element={<LegacyDentalChartRedirect />} />
+              <Route path="treatment-plan" element={<LegacyTreatmentPlanRedirect />} />
+              <Route path="medical-history" element={<LegacyMedicalHistoryRedirect />} />
               <Route path="documents" element={<ClinicalWorkspace kind="documents" />} />
               <Route path="communications" element={<ClinicalWorkspace kind="communications" />} />
             </Route>

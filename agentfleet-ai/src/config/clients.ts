@@ -16,7 +16,7 @@ export interface Client {
 export const CLIENTS: Client[] = [
   {
     email: 'rsingh.gen3@gmail.com',
-    password: 'Aug@2026',
+    password: import.meta.env.VITE_DEMO_VPS_PASSWORD || '',
     clientName: 'Dr. Rajeev Pratap Singh',
     domain: 'Hospital',
     subdomain: 'Dental',
@@ -42,7 +42,8 @@ export const CLIENTS: Client[] = [
 ]
 
 export const validateClient = (email: string, password: string): Client | null => {
-  const client = CLIENTS.find(c => c.email === email && c.password === password)
+  if (!password) return null
+  const client = CLIENTS.find(c => c.email === email && c.password && c.password === password)
   return client || null
 }
 

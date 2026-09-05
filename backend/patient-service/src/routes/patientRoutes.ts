@@ -41,6 +41,17 @@ const campaignUpdateInput = z.object({ name: z.string().trim().min(1).max(160).o
 // Client admins own the clinic's financials; only they may see reports/summaries.
 const ADMIN_ROLES = new Set(['admin', 'super_admin', 'owner', 'client_admin'])
 function isClientAdmin(req: TenantRequest) { return req.user?.isSuperAdmin === true || ADMIN_ROLES.has(req.user?.role || '') }
+function hasPermission(req: TenantRequest, permission: string) {
+  if (isClientAdmin(req)) return true
+  const raw = req.user?.permissions as unknown
+  const permissions = Array.isArray(raw) ? raw : []
+  return permissions.includes(permission) || permissions.includes('*')
+}
+function writePermissionFor(path: string) {
+  if (path.startsWith('/inventory')) return 'inventory:write'
+  if (path.startsWith('/settings') || path.startsWith('/clinic')) return 'settings:write'
+  return 'patients:write'
+}
 
 function ensureFeatureTables(s: string) {
   const existing = featureTableInitializers.get(s)
@@ -85,6 +96,12 @@ function inventoryOrderSelect(s: string, filter = 'TRUE') {
 // All routes require authentication and tenant context
 router.use(authMiddleware)
 router.use(tenantMiddleware)
+router.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next()
+  const needed = writePermissionFor(req.path)
+  if (!hasPermission(req as TenantRequest, needed)) return res.status(403).json({ success: false, message: 'Insufficient permissions' })
+  next()
+})
 
 // Get dashboard data (patients, appointments, stats)
 router.get('/dashboard', PatientController.getDashboardData)
@@ -144,6 +161,7 @@ router.delete('/appointments/:id', PatientController.deleteAppointment)
 
 // Statistics
 router.get('/stats/summary', PatientController.getStatsSummary)
+router.get('/audit-logs', PatientController.getAuditLogs)
 router.get('/stats/visits', PatientController.getVisitsStats)
 
 router.get('/settings', async (req: TenantRequest, res, next) => {
@@ -292,6 +310,10 @@ async function updateInventoryOrderRoute(req: TenantRequest, res: express.Respon
     await withTransaction(async (client) => {
       if (fields.length) { const assignments = fields.map(([name], index) => `${name}=$${index + 1}`); if (input.status === 'placed') assignments.push(`placed_at=COALESCE(placed_at,NOW())`); await client.query(`UPDATE ${s}.inventory_orders SET ${assignments.join(', ')}, updated_at=NOW() WHERE id=$${fields.length + 1}`, [...fields.map(([, value]) => value), id.data]) }
       if (input.items) { await client.query(`DELETE FROM ${s}.inventory_order_items WHERE order_id=$1`, [id.data]); for (const item of input.items) await client.query(`INSERT INTO ${s}.inventory_order_items (order_id, inventory_item_id, item_name, quantity, unit, unit_price, total_price) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [id.data, item.inventoryItemId || null, item.itemName, item.quantity, item.unit, item.unitPrice, item.quantity * item.unitPrice]) }
+      if (input.status === 'received' && current.rows[0].status !== 'received') {
+        const stockItems = await client.query(`SELECT inventory_item_id, quantity FROM ${s}.inventory_order_items WHERE order_id=$1 AND inventory_item_id IS NOT NULL`, [id.data])
+        for (const item of stockItems.rows) await client.query(`UPDATE ${s}.inventory_items SET quantity = quantity + $1, updated_at=NOW() WHERE id=$2 AND is_active`, [item.quantity, item.inventory_item_id])
+      }
       if (input.status && input.status !== current.rows[0].status) await client.query(`INSERT INTO ${s}.inventory_order_events (order_id, event_type, status, description, created_by) VALUES ($1,'status_updated',$2,$3,$4)`, [id.data, input.status, `Order status changed to ${input.status}.`, req.user?.userId || null])
       if ((input.paymentStatus && input.paymentStatus !== current.rows[0].payment_status) || (input.paymentMethod !== undefined && input.paymentMethod !== current.rows[0].payment_method)) {
         const paymentDescription = `Payment updated to ${input.paymentStatus ?? current.rows[0].payment_status}${input.paymentMethod || current.rows[0].payment_method ? ` via ${input.paymentMethod || current.rows[0].payment_method}` : ''}.`
@@ -329,7 +351,7 @@ router.post('/inventory/orders/:id/communications', async (req: TenantRequest, r
     if (input.recipientType === 'vendor') { if (!vendorRecipient) return res.status(400).json({ success: false, message: 'Vendor contact is required' }); recipients.push({ type: 'vendor', value: vendorRecipient }) } else { if (!input.recipient && !patientRecipient) return res.status(400).json({ success: false, message: 'Recipient is required' }); recipients.push({ type: input.recipientType, value: input.recipient || patientRecipient! }) }
     if (input.copyToPatient) { if (!patientId || !patientRecipient) return res.status(400).json({ success: false, message: 'Patient contact is required for a copy' }); recipients.push({ type: 'patient', value: patientRecipient }) }
     const records = await withTransaction(async (client) => { const inserted: unknown[] = []; for (const recipient of recipients) { const result = await client.query(`INSERT INTO ${s}.inventory_communications (order_id, channel, recipient_type, recipient, subject, body, status, created_by) VALUES ($1,$2,$3,$4,$5,$6,'queued',$7) RETURNING *`, [id.data, input.channel, recipient.type, recipient.value, input.subject, input.body, req.user?.userId || null]); inserted.push(result.rows[0]) } return inserted })
-    return res.status(201).json({ success: true, data: records })
+    return res.status(201).json({ success: true, data: records, delivery: messageDeliveryStatus() })
   } catch (error) { if (error instanceof z.ZodError) return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues }); next(error) }
 })
 
