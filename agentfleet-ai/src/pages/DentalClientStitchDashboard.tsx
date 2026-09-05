@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowUpRight, ChevronLeft, ChevronRight, Plus, Search, SmilePlus } from 'lucide-react'
+import { ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, Plus, Search, SmilePlus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { BookingModal, type BookingFormData } from '../components/BookingModal'
 import DentistNotes from '../components/DentistNotes'
