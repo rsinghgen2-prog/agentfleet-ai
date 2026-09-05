@@ -6,11 +6,17 @@ import { describeApiError } from '../utils/apiError'
 let cachedClient: Client | null = null
 let cachedData: DashboardData | null = null
 let cachedSettings: ClinicSettings | null = null
+const cacheListeners = new Set<() => void>()
+
+function emitCache() {
+  for (const listener of cacheListeners) listener()
+}
 
 export function clearDentalDashboardCache() {
   cachedClient = null
   cachedData = null
   cachedSettings = null
+  emitCache()
 }
 
 export function useDentalDashboardData() {
@@ -51,6 +57,17 @@ export function useDentalDashboardData() {
       setSettings(settingsResult.value)
     }
     setLoading(false)
+    emitCache()
+  }, [])
+
+  useEffect(() => {
+    const sync = () => {
+      setClient(cachedClient)
+      setData(cachedData)
+      setSettings(cachedSettings)
+    }
+    cacheListeners.add(sync)
+    return () => { cacheListeners.delete(sync) }
   }, [])
 
   useEffect(() => {
