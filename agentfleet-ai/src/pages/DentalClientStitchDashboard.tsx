@@ -96,7 +96,7 @@ export default function DentalClientStitchDashboard() {
   const selected = filteredAppointments.find((item) => item.id === selectedId) || filteredAppointments[0]
   const navigate = (path: string) => {
     if (selected && path === `/dental-client/customers/${selected.patient_id}`) {
-      routerNavigate(`/dental-client/consultation/${selected.id}`)
+      routerNavigate(`/dental-client/client-consulation?appointment=`)
       return
     }
     routerNavigate(path)

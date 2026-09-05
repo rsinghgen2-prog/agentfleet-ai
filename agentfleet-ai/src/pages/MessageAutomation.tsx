@@ -14,9 +14,9 @@ import {
   Zap,
   ArrowLeft,
   Download,
-  Trash2,
-  Edit
+  Trash2
 } from 'lucide-react'
+import { DashboardService, type MessageCampaign, type MessageCampaignRecipient } from '../services/dashboardService'
 
 const MessageAutomation = () => {
   const navigate = useNavigate()
@@ -24,6 +24,8 @@ const MessageAutomation = () => {
   const [messageType, setMessageType] = useState<'whatsapp' | 'sms'>('whatsapp')
   const [uploadMethod, setUploadMethod] = useState<'file' | 'manual'>('file')
   const [contacts, setContacts] = useState<any[]>([])
+  const [campaigns, setCampaigns] = useState<MessageCampaign[]>([])
+  const [feedback, setFeedback] = useState('')
   const [messageData, setMessageData] = useState({
     subject: '',
     message: '',
@@ -40,6 +42,12 @@ const MessageAutomation = () => {
       navigate('/register')
     }
   }, [navigate])
+
+  const loadCampaigns = async () => {
+    try { setCampaigns(await DashboardService.getMessageCampaigns()) }
+    catch (error) { setFeedback(error instanceof Error ? error.message : 'Unable to load campaigns') }
+  }
+  useEffect(() => { void loadCampaigns() }, [])
 
   // Load user subscription status from localStorage
   const [userSubscription] = useState(() => {
@@ -75,73 +83,42 @@ const MessageAutomation = () => {
     }
   })
 
-  const campaigns = [
-    {
-      id: 1,
-      name: 'Summer Sale 2026',
-      type: 'WhatsApp',
-      recipients: 1250,
-      sent: 1250,
-      delivered: 1230,
-      status: 'Completed',
-      date: '2026-07-20',
-    },
-    {
-      id: 2,
-      name: 'New Product Launch',
-      type: 'SMS',
-      recipients: 850,
-      sent: 850,
-      delivered: 840,
-      status: 'Completed',
-      date: '2026-07-18',
-    },
-    {
-      id: 3,
-      name: 'Weekly Newsletter',
-      type: 'WhatsApp',
-      recipients: 2100,
-      sent: 0,
-      delivered: 0,
-      status: 'Scheduled',
-      date: '2026-07-25',
-    },
-  ]
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      // Simulate CSV parsing
-      const mockContacts = [
-        { name: 'John Doe', phone: '+1234567890', email: 'john@example.com' },
-        { name: 'Jane Smith', phone: '+1234567891', email: 'jane@example.com' },
-        { name: 'Bob Johnson', phone: '+1234567892', email: 'bob@example.com' },
-      ]
-      setContacts(mockContacts)
-    }
+    if (!file) return
+    if (!file.name.toLowerCase().endsWith('.csv')) { setFeedback('Upload a CSV file with Name, Phone, Email columns.'); return }
+    const rows = (await file.text()).split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+    const parsed = rows.slice(1).map((line) => { const [name = '', phone = '', email = ''] = line.split(',').map((value) => value.trim()); return { name, phone, email: email || null } }).filter((contact) => contact.phone.length >= 5)
+    setContacts(parsed); setFeedback(parsed.length ? `${parsed.length} contacts loaded.` : 'No valid contacts found in the CSV.')
   }
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     const totalRecipients = contacts.length
     const remainingMessages = userSubscription.messageLimit - userSubscription.messagesUsedToday
 
     if (!userSubscription.isSubscribed && totalRecipients > remainingMessages) {
-      alert(`You can only send ${remainingMessages} more messages today. Upgrade to send unlimited messages!`)
+      setFeedback(`You can only send ${remainingMessages} more messages today.`)
       return
     }
 
     if (!messageData.message) {
-      alert('Please enter a message')
+      setFeedback('Enter a message before continuing.')
       return
     }
 
     if (contacts.length === 0) {
-      alert('Please upload contacts first')
+      setFeedback('Add at least one valid contact before continuing.')
       return
     }
-
-    alert(`Success! Message will be sent to ${totalRecipients} recipients via ${messageType.toUpperCase()}`)
+    const scheduledAt = messageData.scheduleType === 'later' && messageData.scheduleDate && messageData.scheduleTime ? new Date(`${messageData.scheduleDate}T${messageData.scheduleTime}`).toISOString() : null
+    try {
+      const campaign = await DashboardService.createMessageCampaign({ name: messageData.subject.trim() || `Campaign ${new Date().toLocaleDateString('en-IN')}`, channel: messageType, message: messageData.message.trim(), recipients: contacts as MessageCampaignRecipient[], scheduledAt })
+      const queued = scheduledAt ? campaign : (await DashboardService.queueMessageCampaign(campaign.id)).campaign
+      setCampaigns((current) => [queued, ...current]); setFeedback(scheduledAt ? 'Campaign scheduled.' : 'Campaign queued for provider delivery.'); setMessageData({ subject: '', message: '', scheduleType: 'now', scheduleDate: '', scheduleTime: '' }); setContacts([])
+    } catch (error) { setFeedback(error instanceof Error ? error.message : 'Unable to save campaign') }
   }
+
+  const deleteCampaign = async (id: string) => { try { await DashboardService.deleteMessageCampaign(id); setCampaigns((current) => current.filter((campaign) => campaign.id !== id)); setFeedback('Campaign deleted.') } catch (error) { setFeedback(error instanceof Error ? error.message : 'Unable to delete campaign') } }
 
   const downloadTemplate = () => {
     const csvContent = "Name,Phone,Email\nJohn Doe,+1234567890,john@example.com\nJane Smith,+1234567891,jane@example.com"
@@ -434,6 +411,7 @@ const MessageAutomation = () => {
               <Send size={20} />
               {messageData.scheduleType === 'now' ? 'Send Message' : 'Schedule Message'}
             </motion.button>
+            {feedback && <p role="status" className="text-center text-sm text-gray-300">{feedback}</p>}
 
             {!userSubscription.isSubscribed && (
               <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
@@ -479,27 +457,24 @@ const MessageAutomation = () => {
                       <td className="py-4 px-4 font-semibold">{campaign.name}</td>
                       <td className="py-4 px-4">
                         <span className={`px-3 py-1 rounded-full text-sm ${
-                          campaign.type === 'WhatsApp' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'
+                          campaign.channel === 'whatsapp' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'
                         }`}>
-                          {campaign.type}
+                          {campaign.channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
                         </span>
                       </td>
-                      <td className="py-4 px-4">{campaign.recipients}</td>
-                      <td className="py-4 px-4">{campaign.delivered}</td>
+                      <td className="py-4 px-4">{campaign.recipient_count}</td>
+                      <td className="py-4 px-4">-</td>
                       <td className="py-4 px-4">
                         <span className={`px-3 py-1 rounded-full text-sm ${
-                          campaign.status === 'Completed' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                          campaign.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
                         }`}>
                           {campaign.status}
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-gray-400">{campaign.date}</td>
+                      <td className="py-4 px-4 text-gray-400">{new Date(campaign.scheduled_at || campaign.created_at).toLocaleDateString('en-IN')}</td>
                       <td className="py-4 px-4">
                         <div className="flex gap-2">
-                          <button className="p-2 hover:bg-white/10 rounded-lg transition-all">
-                            <Edit size={16} />
-                          </button>
-                          <button className="p-2 hover:bg-red-500/20 rounded-lg transition-all text-red-400">
+                          <button onClick={() => void deleteCampaign(campaign.id)} disabled={!['draft', 'cancelled'].includes(campaign.status)} aria-label={`Delete ${campaign.name}`} className="p-2 hover:bg-red-500/20 rounded-lg transition-all text-red-400 disabled:cursor-not-allowed disabled:opacity-40">
                             <Trash2 size={16} />
                           </button>
                         </div>

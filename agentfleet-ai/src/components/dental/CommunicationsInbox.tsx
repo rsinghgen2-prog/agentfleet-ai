@@ -15,7 +15,7 @@ export default function CommunicationsInbox() {
   const [error, setError] = useState('')
 
   const loadConversations = async () => {
-    try { setConversations(await DashboardService.getSupportConversations()); setError('') }
+    try { setConversations(await DashboardService.getSupportConversations({ date: todayKey() })); setError('') }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to load today's communications") }
     finally { setLoading(false) }
   }

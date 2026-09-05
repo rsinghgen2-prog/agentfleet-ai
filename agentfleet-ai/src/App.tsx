@@ -109,7 +109,7 @@ function App() {
               <Route path="inventory" element={<DentalClientInventory />} />
               <Route path="payments" element={<DentalClientPayments />} />
               <Route path="settings" element={<DentalClientSettings />} />
-              <Route path="consultation/:appointmentId" element={<PatientConsultation />} />
+              <Route path="client-consulation" element={<PatientConsultation />} />
               <Route path="dental-chart" element={<ClinicalWorkspace kind="chart" />} />
               <Route path="treatment-plan" element={<ClinicalWorkspace kind="treatment" />} />
               <Route path="medical-history" element={<ClinicalWorkspace kind="history" />} />

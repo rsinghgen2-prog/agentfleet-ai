@@ -6,7 +6,9 @@ import { tenantMiddleware } from '../middleware/tenantMiddleware.js'
 import type { TenantRequest } from '../types.js'
 import { pool, withTransaction } from '../config/database.js'
 import { quoteIdentifier } from '../utils/sql.js'
+import { messageDeliveryStatus } from '../utils/messageDelivery.js'
 import { SupportController } from '../controllers/supportController.js'
+import { ClinicalController } from '../controllers/clinicalController.js'
 
 const router = express.Router()
 const featureTableInitializers = new Map<string, Promise<void>>()
@@ -26,6 +28,15 @@ const paymentStatus = z.enum(['pending', 'paid', 'failed', 'refunded'])
 const paymentMethod = z.enum(['cash', 'cheque', 'online', 'bank_transfer', 'card', 'upi'])
 const paymentCreateInput = z.object({ customerId: z.string().uuid(), paymentNumber: z.string().trim().max(80).optional(), amount: z.coerce.number().finite().min(0), currency: z.string().trim().length(3).optional().default('INR'), status: paymentStatus.default('pending'), method: paymentMethod.optional().nullable(), description: z.string().trim().max(4000).optional().default('') })
 const paymentUpdateInput = z.object({ amount: z.coerce.number().finite().min(0).optional(), currency: z.string().trim().length(3).optional(), status: paymentStatus.optional(), method: paymentMethod.optional().nullable(), description: z.string().trim().max(4000).optional() })
+const invoiceStatus = z.enum(['draft', 'issued', 'paid', 'void', 'overdue'])
+const invoiceLineItem = z.object({ description: z.string().trim().min(1).max(500), quantity: z.coerce.number().positive().default(1), unitPrice: z.coerce.number().finite().min(0), amount: z.coerce.number().finite().min(0).optional() })
+const invoiceCreateInput = z.object({ customerId: z.string().uuid(), invoiceNumber: z.string().trim().max(80).optional(), currency: z.string().trim().length(3).default('INR'), status: invoiceStatus.default('draft'), dueDate: z.string().date().optional().nullable(), notes: z.string().trim().max(4000).default(''), lineItems: z.array(invoiceLineItem).min(1).max(100) })
+const invoiceUpdateInput = z.object({ status: invoiceStatus.optional(), dueDate: z.string().date().optional().nullable(), notes: z.string().trim().max(4000).optional(), lineItems: z.array(invoiceLineItem).min(1).max(100).optional(), paymentId: z.string().uuid().optional().nullable() })
+const campaignChannel = z.enum(['whatsapp', 'sms'])
+const campaignStatus = z.enum(['draft', 'scheduled', 'queued', 'cancelled', 'completed'])
+const campaignRecipient = z.object({ name: z.string().trim().max(160).optional().default(''), phone: z.string().trim().min(5).max(50), email: z.string().email().optional().nullable() })
+const campaignCreateInput = z.object({ name: z.string().trim().min(1).max(160), channel: campaignChannel, subject: z.string().trim().max(255).optional().default(''), message: z.string().trim().min(1).max(5000), recipients: z.array(campaignRecipient).min(1).max(10000), scheduledAt: z.string().datetime().optional().nullable() })
+const campaignUpdateInput = z.object({ name: z.string().trim().min(1).max(160).optional(), subject: z.string().trim().max(255).optional(), message: z.string().trim().min(1).max(5000).optional(), scheduledAt: z.string().datetime().optional().nullable(), status: campaignStatus.optional() })
 
 // Client admins own the clinic's financials; only they may see reports/summaries.
 const ADMIN_ROLES = new Set(['admin', 'super_admin', 'owner', 'client_admin'])
@@ -43,12 +54,20 @@ function ensureFeatureTables(s: string) {
     await pool.query(`CREATE TABLE IF NOT EXISTS ${s}.inventory_order_events (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_id UUID NOT NULL REFERENCES ${s}.inventory_orders(id) ON DELETE CASCADE, event_type VARCHAR(80) NOT NULL, status VARCHAR(30), description TEXT NOT NULL DEFAULT '', location VARCHAR(255) NOT NULL DEFAULT '', occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), created_by UUID REFERENCES ${s}.users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
     await pool.query(`CREATE TABLE IF NOT EXISTS ${s}.inventory_communications (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_id UUID NOT NULL REFERENCES ${s}.inventory_orders(id) ON DELETE CASCADE, channel VARCHAR(10) NOT NULL CHECK (channel IN ('email', 'sms')), recipient_type VARCHAR(20) NOT NULL CHECK (recipient_type IN ('vendor', 'patient', 'client')), recipient VARCHAR(255) NOT NULL, subject VARCHAR(255) NOT NULL DEFAULT '', body TEXT NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'queued', sent_at TIMESTAMPTZ, created_by UUID REFERENCES ${s}.users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
     await pool.query(`CREATE TABLE IF NOT EXISTS ${s}.payments (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), customer_id UUID NOT NULL REFERENCES ${s}.patients(id) ON DELETE CASCADE, payment_number VARCHAR(80) NOT NULL UNIQUE, amount NUMERIC(12,2) NOT NULL CHECK (amount >= 0), currency VARCHAR(3) NOT NULL DEFAULT 'INR', status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed', 'refunded')), method VARCHAR(20) CHECK (method IN ('cash', 'cheque', 'online', 'bank_transfer', 'card', 'upi')), description TEXT NOT NULL DEFAULT '', paid_at TIMESTAMPTZ, created_by UUID REFERENCES ${s}.users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS ${s}.invoices (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), customer_id UUID NOT NULL REFERENCES ${s}.patients(id) ON DELETE CASCADE, payment_id UUID REFERENCES ${s}.payments(id) ON DELETE SET NULL, invoice_number VARCHAR(80) NOT NULL UNIQUE, currency VARCHAR(3) NOT NULL DEFAULT 'INR', status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'issued', 'paid', 'void', 'overdue')), due_date DATE, notes TEXT NOT NULL DEFAULT '', line_items JSONB NOT NULL DEFAULT '[]'::jsonb, total_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (total_amount >= 0), created_by UUID REFERENCES ${s}.users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS ${s}.message_campaigns (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name VARCHAR(160) NOT NULL, channel VARCHAR(20) NOT NULL CHECK (channel IN ('whatsapp', 'sms')), subject VARCHAR(255) NOT NULL DEFAULT '', message TEXT NOT NULL, recipients JSONB NOT NULL DEFAULT '[]'::jsonb, status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'queued', 'cancelled', 'completed')), scheduled_at TIMESTAMPTZ, created_by UUID REFERENCES ${s}.users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_payments_customer ON ${s}.payments (customer_id, created_at DESC)`)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_payments_status ON ${s}.payments (status, created_at DESC)`)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_invoices_customer ON ${s}.invoices (customer_id, status, due_date)`)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_message_campaigns_status ON ${s}.message_campaigns (status, scheduled_at, created_at DESC)`)
     await pool.query(`DROP TRIGGER IF EXISTS hospital_directory_updated_at ON ${s}.hospital_directory`)
     await pool.query(`CREATE TRIGGER hospital_directory_updated_at BEFORE UPDATE ON ${s}.hospital_directory FOR EACH ROW EXECUTE FUNCTION ${s}.set_updated_at()`)
     await pool.query(`DROP TRIGGER IF EXISTS payments_updated_at ON ${s}.payments`)
     await pool.query(`CREATE TRIGGER payments_updated_at BEFORE UPDATE ON ${s}.payments FOR EACH ROW EXECUTE FUNCTION ${s}.set_updated_at()`)
+    await pool.query(`DROP TRIGGER IF EXISTS invoices_updated_at ON ${s}.invoices`)
+    await pool.query(`CREATE TRIGGER invoices_updated_at BEFORE UPDATE ON ${s}.invoices FOR EACH ROW EXECUTE FUNCTION ${s}.set_updated_at()`)
+    await pool.query(`DROP TRIGGER IF EXISTS message_campaigns_updated_at ON ${s}.message_campaigns`)
+    await pool.query(`CREATE TRIGGER message_campaigns_updated_at BEFORE UPDATE ON ${s}.message_campaigns FOR EACH ROW EXECUTE FUNCTION ${s}.set_updated_at()`)
   })()
   featureTableInitializers.set(s, initializer)
   initializer.catch(() => featureTableInitializers.delete(s))
@@ -85,15 +104,26 @@ router.get('/support/chat', SupportController.getChat)
 router.post('/support/conversations', SupportController.createConversation)
 router.get('/support/conversations', SupportController.listConversations)
 router.get('/support/conversations/:id', SupportController.getConversation)
+router.patch('/support/conversations/:id', SupportController.updateConversationStatus)
 router.post('/support/conversations/:id/messages', SupportController.sendMessage)
 
 // Patient routes
 router.get('/patients', PatientController.getPatients)
 router.get('/patients/:id/profile', PatientController.getPatientProfile)
+router.get('/patients/:patientId/treatment-plans', ClinicalController.listTreatmentPlans)
+router.post('/patients/:patientId/treatment-plans', ClinicalController.createTreatmentPlan)
+router.patch('/patients/:patientId/treatment-plans/:id', ClinicalController.updateTreatmentPlan)
+router.delete('/patients/:patientId/treatment-plans/:id', ClinicalController.deleteTreatmentPlan)
+router.get('/patients/:patientId/dental-chart', ClinicalController.listToothRecords)
+router.put('/patients/:patientId/dental-chart/teeth/:toothNumber', ClinicalController.upsertToothRecord)
+router.get('/patients/:id/prescriptions', PatientController.listPrescriptions)
 router.post('/patients/:id/prescriptions', PatientController.createPrescription)
 router.patch('/patients/:id/prescriptions/:prescriptionId', PatientController.updatePrescription)
+router.delete('/patients/:id/prescriptions/:prescriptionId', PatientController.deletePrescription)
+router.get('/patients/:id/reports', PatientController.listReports)
 router.post('/patients/:id/reports', PatientController.createReport)
 router.get('/patients/:id/reports/:reportId/download', PatientController.downloadReport)
+router.delete('/patients/:id/reports/:reportId', PatientController.deleteReport)
 router.post('/patients/:id/lab-orders', PatientController.createLabOrder)
 router.get('/patients/:id/lab-orders/:orderId/download', PatientController.downloadLabOrder)
 router.get('/patients/:id', PatientController.getPatientById)
@@ -312,7 +342,99 @@ router.post('/inventory/orders/:id/reorder', async (req: TenantRequest, res, nex
   } catch (error) { next(error) }
 })
 
-// ---- Payments (customer billing ledger) ----
+// ---- Message automation ----
+router.get('/message-campaigns', async (req: TenantRequest, res, next) => {
+  try {
+    if (!isClientAdmin(req)) return res.status(403).json({ success: false, message: 'Only client admins can view campaigns' })
+    const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s); const status = typeof req.query.status === 'string' ? campaignStatus.safeParse(req.query.status) : null
+    if (status && !status.success) return res.status(400).json({ success: false, message: 'Invalid campaign status' })
+    const result = await pool.query(`SELECT *, jsonb_array_length(recipients) AS recipient_count FROM ${s}.message_campaigns ${status?.data ? 'WHERE status = $1' : ''} ORDER BY created_at DESC`, status?.data ? [status.data] : [])
+    return res.json({ success: true, data: result.rows })
+  } catch (error) { next(error) }
+})
+
+router.post('/message-campaigns', async (req: TenantRequest, res, next) => {
+  try {
+    if (!isClientAdmin(req)) return res.status(403).json({ success: false, message: 'Only client admins can create campaigns' })
+    const input = campaignCreateInput.parse(req.body); const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s)
+    const status = input.scheduledAt ? 'scheduled' : 'draft'; const result = await pool.query(`INSERT INTO ${s}.message_campaigns (name, channel, subject, message, recipients, status, scheduled_at, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *, jsonb_array_length(recipients) AS recipient_count`, [input.name, input.channel, input.subject, input.message, JSON.stringify(input.recipients), status, input.scheduledAt || null, req.user?.userId || null])
+    return res.status(201).json({ success: true, data: result.rows[0] })
+  } catch (error) { if (error instanceof z.ZodError) return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues }); next(error) }
+})
+
+router.patch('/message-campaigns/:id', async (req: TenantRequest, res, next) => {
+  try {
+    if (!isClientAdmin(req)) return res.status(403).json({ success: false, message: 'Only client admins can update campaigns' })
+    const id = z.string().uuid().safeParse(req.params.id); if (!id.success) return res.status(400).json({ success: false, message: 'Invalid campaign id' }); const input = campaignUpdateInput.parse(req.body); const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s)
+    const fields: Array<[string, unknown]> = []; if (input.name !== undefined) fields.push(['name', input.name]); if (input.subject !== undefined) fields.push(['subject', input.subject]); if (input.message !== undefined) fields.push(['message', input.message]); if (input.scheduledAt !== undefined) fields.push(['scheduled_at', input.scheduledAt || null]); if (input.status !== undefined) fields.push(['status', input.status]); if (!fields.length) return res.status(400).json({ success: false, message: 'No fields to update' })
+    const assignments = fields.map(([column], index) => `${column} = $${index + 1}`); const result = await pool.query(`UPDATE ${s}.message_campaigns SET ${assignments.join(', ')}, updated_at = NOW() WHERE id = $${fields.length + 1} AND status IN ('draft', 'scheduled', 'cancelled') RETURNING *, jsonb_array_length(recipients) AS recipient_count`, [...fields.map(([, value]) => value), id.data])
+    if (!result.rowCount) return res.status(409).json({ success: false, message: 'Campaign not found or cannot be changed after queueing' }); return res.json({ success: true, data: result.rows[0] })
+  } catch (error) { if (error instanceof z.ZodError) return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues }); next(error) }
+})
+
+router.post('/message-campaigns/:id/queue', async (req: TenantRequest, res, next) => {
+  try {
+    if (!isClientAdmin(req)) return res.status(403).json({ success: false, message: 'Only client admins can queue campaigns' })
+    const id = z.string().uuid().safeParse(req.params.id); if (!id.success) return res.status(400).json({ success: false, message: 'Invalid campaign id' }); const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s)
+    const result = await pool.query(`UPDATE ${s}.message_campaigns SET status = 'queued', updated_at = NOW() WHERE id = $1 AND status IN ('draft', 'scheduled') AND (scheduled_at IS NULL OR scheduled_at <= NOW()) RETURNING *, jsonb_array_length(recipients) AS recipient_count`, [id.data])
+    if (!result.rowCount) return res.status(409).json({ success: false, message: 'Campaign is not ready to queue' })
+    return res.json({ success: true, data: { campaign: result.rows[0], delivery: messageDeliveryStatus() } })
+  } catch (error) { next(error) }
+})
+
+router.delete('/message-campaigns/:id', async (req: TenantRequest, res, next) => {
+  try {
+    if (!isClientAdmin(req)) return res.status(403).json({ success: false, message: 'Only client admins can delete campaigns' })
+    const id = z.string().uuid().safeParse(req.params.id); if (!id.success) return res.status(400).json({ success: false, message: 'Invalid campaign id' }); const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s)
+    const result = await pool.query(`DELETE FROM ${s}.message_campaigns WHERE id = $1 AND status IN ('draft', 'cancelled') RETURNING id`, [id.data]); if (!result.rowCount) return res.status(409).json({ success: false, message: 'Only draft or cancelled campaigns can be deleted' }); return res.json({ success: true, data: result.rows[0] })
+  } catch (error) { next(error) }
+})
+
+// ---- Invoices and payments (customer billing ledger) ----
+function invoiceSelect(s: string, filter = 'TRUE') {
+  return `SELECT inv.*, p.first_name, p.last_name, p.email, p.phone FROM ${s}.invoices inv JOIN ${s}.patients p ON p.id = inv.customer_id WHERE ${filter}`
+}
+
+router.get('/invoices', async (req: TenantRequest, res, next) => {
+  try {
+    const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s); const params: unknown[] = []; const filters = ['TRUE']
+    if (typeof req.query.customerId === 'string') { const parsed = z.string().uuid().safeParse(req.query.customerId); if (!parsed.success) return res.status(400).json({ success: false, message: 'Invalid customer id' }); params.push(parsed.data); filters.push(`inv.customer_id = $${params.length}`) }
+    if (typeof req.query.status === 'string') { const parsed = invoiceStatus.safeParse(req.query.status); if (!parsed.success) return res.status(400).json({ success: false, message: 'Invalid invoice status' }); params.push(parsed.data); filters.push(`inv.status = $${params.length}`) }
+    const result = await pool.query(`${invoiceSelect(s, filters.join(' AND '))} ORDER BY inv.created_at DESC`, params)
+    return res.json({ success: true, data: result.rows })
+  } catch (error) { next(error) }
+})
+
+router.post('/invoices', async (req: TenantRequest, res, next) => {
+  try {
+    if (!isClientAdmin(req)) return res.status(403).json({ success: false, message: 'Only client admins can create invoices' })
+    const input = invoiceCreateInput.parse(req.body); const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s)
+    const lineItems = input.lineItems.map((item) => ({ ...item, amount: item.amount ?? item.quantity * item.unitPrice })); const total = lineItems.reduce((sum, item) => sum + item.amount, 0); const invoiceNumber = input.invoiceNumber || `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-8)}`
+    const inserted = await pool.query(`INSERT INTO ${s}.invoices (customer_id, invoice_number, currency, status, due_date, notes, line_items, total_amount, created_by) SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9 WHERE EXISTS (SELECT 1 FROM ${s}.patients WHERE id = $1 AND is_active) RETURNING id`, [input.customerId, invoiceNumber, input.currency, input.status, input.dueDate || null, input.notes, JSON.stringify(lineItems), total, req.user?.userId || null])
+    if (!inserted.rowCount) return res.status(404).json({ success: false, message: 'Customer not found' })
+    const result = await pool.query(invoiceSelect(s, 'inv.id = $1'), [inserted.rows[0].id]); return res.status(201).json({ success: true, data: result.rows[0] })
+  } catch (error) { if (error instanceof z.ZodError) return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues }); next(error) }
+})
+
+router.patch('/invoices/:id', async (req: TenantRequest, res, next) => {
+  try {
+    if (!isClientAdmin(req)) return res.status(403).json({ success: false, message: 'Only client admins can update invoices' })
+    const id = z.string().uuid().safeParse(req.params.id); if (!id.success) return res.status(400).json({ success: false, message: 'Invalid invoice id' }); const input = invoiceUpdateInput.parse(req.body); const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s)
+    const fields: Array<[string, unknown]> = []; if (input.status !== undefined) fields.push(['status', input.status]); if (input.dueDate !== undefined) fields.push(['due_date', input.dueDate || null]); if (input.notes !== undefined) fields.push(['notes', input.notes]); if (input.paymentId !== undefined) fields.push(['payment_id', input.paymentId || null]); if (input.lineItems) { const lineItems = input.lineItems.map((item) => ({ ...item, amount: item.amount ?? item.quantity * item.unitPrice })); fields.push(['line_items', JSON.stringify(lineItems)], ['total_amount', lineItems.reduce((sum, item) => sum + item.amount, 0)]) }
+    if (!fields.length) return res.status(400).json({ success: false, message: 'No fields to update' })
+    const assignments = fields.map(([column], index) => `${column} = $${index + 1}${column === 'line_items' ? '::jsonb' : ''}`); const updated = await pool.query(`UPDATE ${s}.invoices SET ${assignments.join(', ')}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING id`, [...fields.map(([, value]) => value), id.data])
+    if (!updated.rowCount) return res.status(404).json({ success: false, message: 'Invoice not found' }); const result = await pool.query(invoiceSelect(s, 'inv.id = $1'), [id.data]); return res.json({ success: true, data: result.rows[0] })
+  } catch (error) { if (error instanceof z.ZodError) return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues }); next(error) }
+})
+
+router.delete('/invoices/:id', async (req: TenantRequest, res, next) => {
+  try {
+    if (!isClientAdmin(req)) return res.status(403).json({ success: false, message: 'Only client admins can delete invoices' })
+    const id = z.string().uuid().safeParse(req.params.id); if (!id.success) return res.status(400).json({ success: false, message: 'Invalid invoice id' }); const s = quoteIdentifier(req.tenant!.schemaName); await ensureFeatureTables(s)
+    const result = await pool.query(`DELETE FROM ${s}.invoices WHERE id = $1 AND status = 'draft' RETURNING id`, [id.data]); if (!result.rowCount) return res.status(409).json({ success: false, message: 'Only draft invoices can be deleted' }); return res.json({ success: true, data: result.rows[0] })
+  } catch (error) { next(error) }
+})
+
 function paymentSelect(s: string, filter = 'TRUE') {
   return `SELECT pay.*, p.first_name, p.last_name, p.email, p.phone
     FROM ${s}.payments pay JOIN ${s}.patients p ON p.id = pay.customer_id WHERE ${filter}`

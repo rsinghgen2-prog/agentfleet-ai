@@ -6,6 +6,7 @@ import { quoteIdentifier } from '../utils/sql.js'
 
 const conversationInput = z.object({ subject: z.string().trim().min(1).max(160).default('Hospital support') })
 const messageInput = z.object({ body: z.string().trim().min(1).max(5000) })
+const conversationStatusInput = z.object({ status: z.enum(['open', 'closed']) })
 const supportTableInitializers = new Map<string, Promise<void>>()
 
 function schema(req: TenantRequest) { if (!req.tenant) throw new Error('Tenant context is missing'); return quoteIdentifier(req.tenant.schemaName) }
@@ -48,7 +49,13 @@ export class SupportController {
     try {
       if (!isSupportAgent(req)) return res.status(403).json({ success: false, message: 'Support agent access is required' })
       const s = schema(req); await ensureSupportTables(s)
-      const result = await pool.query(`SELECT c.id, c.subject, c.status, c.created_by, u.full_name AS requester_name, c.created_at, c.updated_at FROM ${s}.support_conversations c JOIN ${s}.users u ON u.id = c.created_by ORDER BY c.updated_at DESC LIMIT 100`)
+      const date = z.string().date().optional().safeParse(req.query.date)
+      const status = z.enum(['open', 'closed']).optional().safeParse(req.query.status)
+      if (!date.success || !status.success) return res.status(400).json({ success: false, message: 'date or status filter is invalid' })
+      const clauses: string[] = []; const values: unknown[] = []
+      if (date.data) { values.push(date.data); clauses.push(`c.updated_at >= $${values.length}::date AND c.updated_at < $${values.length}::date + INTERVAL '1 day'`) }
+      if (status.data) { values.push(status.data); clauses.push(`c.status = $${values.length}`) }
+      const result = await pool.query(`SELECT c.id, c.subject, c.status, c.created_by, u.full_name AS requester_name, c.created_at, c.updated_at FROM ${s}.support_conversations c JOIN ${s}.users u ON u.id = c.created_by ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY c.updated_at DESC LIMIT 100`, values)
       return res.json({ success: true, data: result.rows })
     } catch (error) { return sendError(res, error, 'Failed to fetch support conversations') }
   }
@@ -81,6 +88,19 @@ export class SupportController {
       if (!conversation) return res.status(404).json({ success: false, message: 'Support conversation not found' })
       return res.json({ success: true, data: { conversation, messages: await messages(s, conversation.id) } })
     } catch (error) { return sendError(res, error, 'Failed to fetch support conversation') }
+  }
+
+  static async updateConversationStatus(req: TenantRequest, res: Response) {
+    try {
+      if (!isSupportAgent(req)) return res.status(403).json({ success: false, message: 'Support agent access is required' })
+      const input = conversationStatusInput.parse(req.body); const parsedId = z.string().uuid().safeParse(req.params.id)
+      if (!parsedId.success) return res.status(400).json({ success: false, message: 'Invalid support conversation id' })
+      const s = schema(req); await ensureSupportTables(s)
+      const result = await pool.query(`UPDATE ${s}.support_conversations SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id, subject, status, created_by, created_at, updated_at`, [input.status, parsedId.data])
+      if (!result.rowCount) return res.status(404).json({ success: false, message: 'Support conversation not found' })
+      await audit(s, req, 'update', 'support_conversation', parsedId.data, result.rows[0])
+      return res.json({ success: true, data: result.rows[0] })
+    } catch (error) { return sendError(res, error, 'Failed to update support conversation') }
   }
 
   static async sendMessage(req: TenantRequest, res: Response) {
