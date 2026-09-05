@@ -171,7 +171,7 @@ export default function DentalClientPatients() {
         await DashboardService.updateAppointment(changeVisit.visit.id, {
           appointmentDate: intent.date,
           appointmentTime: intent.time.slice(0, 5),
-          status: changeVisit.visit.status === 'in_progress' ? 'scheduled' : changeVisit.visit.status,
+          ...(changeVisit.visit.status === 'in_progress' ? { status: 'scheduled' as const } : {}),
         })
       } else {
         const notes = [changeVisit.visit.notes, `Cancelled: ${intent.reason}`].filter(Boolean).join('\n')

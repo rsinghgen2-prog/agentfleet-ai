@@ -7,6 +7,7 @@ import { DashboardService, type Appointment } from '../services/dashboardService
 import { consultationPath } from '../utils/consultation'
 import { describeApiError } from '../utils/apiError'
 import { appointmentDuration, clinicHoursLabel, formatClinicClock, workingHoursForDate } from '../utils/clinicSchedule'
+import { ClinicDataStatus } from '../components/dental/ClinicDataStatus'
 
 const weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
