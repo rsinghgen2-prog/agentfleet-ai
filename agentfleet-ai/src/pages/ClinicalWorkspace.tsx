@@ -1,22 +1,20 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { FileText, HeartPulse, MessageSquare, Search, Send, Smile, Stethoscope, Upload, UserRound } from 'lucide-react'
+import { FileText, HeartPulse, Search, Send, Smile, Stethoscope, Upload, UserRound } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { DashboardService, type DentistNote, type Patient, type PatientProfile } from '../services/dashboardService'
-import CommunicationsInbox from '../components/dental/CommunicationsInbox'
 import { DentalChartPanel } from '../components/dental/DentalChartPanel'
 import { MedicalHistoryPanel } from '../components/dental/MedicalHistoryPanel'
 import { TreatmentPlanPanel } from '../components/dental/TreatmentPlanPanel'
 import { describeApiError } from '../utils/apiError'
 import { ClinicDataStatus } from '../components/dental/ClinicDataStatus'
 
-type Workspace = 'chart' | 'treatment' | 'history' | 'notes' | 'documents' | 'communications'
+type Workspace = 'chart' | 'treatment' | 'history' | 'notes' | 'documents'
 const copy: Record<Workspace, { title: string; eyebrow: string; description: string; icon: typeof Smile }> = {
   chart: { title: 'Dental Chart', eyebrow: 'Clinical record', description: 'Review tooth conditions and the current treatment context for every patient.', icon: Smile },
   treatment: { title: 'Treatment Plan', eyebrow: 'Care coordination', description: 'Track planned care and the next clinical action for each patient.', icon: Stethoscope },
   history: { title: 'Medical History', eyebrow: 'Patient safety', description: 'Review contact details, medical notes, alerts, and visit history before treatment.', icon: HeartPulse },
   notes: { title: 'Clinical Notes', eyebrow: 'Provider workspace', description: 'Create and maintain internal notes for the clinic team.', icon: FileText },
   documents: { title: 'Documents', eyebrow: 'Patient records', description: 'Find clinical reports and laboratory documents attached to patient records.', icon: FileText },
-  communications: { title: 'Communications', eyebrow: 'Patient support', description: 'Review the clinic support conversation and send a message to the care team.', icon: MessageSquare },
 }
 
 export default function ClinicalWorkspace({ kind }: { kind: Workspace }) {
@@ -56,7 +54,7 @@ export default function ClinicalWorkspace({ kind }: { kind: Workspace }) {
   const filtered = patients.filter((patient) => `${patient.first_name} ${patient.last_name} ${patient.phone || ''} ${patient.email || ''}`.toLowerCase().includes(query.toLowerCase()))
   const Icon = metadata.icon
   const error = listError || profileError
-  return <div className="min-h-[calc(100vh-4rem)] px-4 py-6 pb-24 sm:px-6 lg:px-8"><div className="mb-6"><div className="flex items-center gap-2 text-[#005db6]"><Icon size={18} /><p className="text-xs font-bold uppercase tracking-[0.16em]">{metadata.eyebrow}</p></div><h1 className="mt-2 text-2xl font-bold text-[#151c23] sm:text-3xl">{metadata.title}</h1><p className="mt-2 max-w-2xl text-sm text-[#727783]">{metadata.description}</p></div><ClinicDataStatus error={error} onRetry={retry} empty={!loading && !error && patients.length === 0} emptyText="No patients are in this clinic yet." /><div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]"><PatientPicker patients={filtered} query={query} loading={loading} loadFailed={Boolean(listError)} selectedId={selectedId} setQuery={setQuery} choose={choose} />{kind === 'chart' && <ChartPanel profile={profile} />}{kind === 'treatment' && <TreatmentPanel profile={profile} />}{kind === 'history' && <HistoryPanel profile={profile} />}{kind === 'notes' && <NotesPanel />}{kind === 'documents' && <DocumentsPanel profile={profile} />}{kind === 'communications' && <CommunicationsInbox />}</div></div>
+  return <div className="min-h-[calc(100vh-4rem)] px-4 py-6 pb-24 sm:px-6 lg:px-8"><div className="mb-6"><div className="flex items-center gap-2 text-[#005db6]"><Icon size={18} /><p className="text-xs font-bold uppercase tracking-[0.16em]">{metadata.eyebrow}</p></div><h1 className="mt-2 text-2xl font-bold text-[#151c23] sm:text-3xl">{metadata.title}</h1><p className="mt-2 max-w-2xl text-sm text-[#727783]">{metadata.description}</p></div><ClinicDataStatus error={error} onRetry={retry} empty={!loading && !error && patients.length === 0} emptyText="No patients are in this clinic yet." /><div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]"><PatientPicker patients={filtered} query={query} loading={loading} loadFailed={Boolean(listError)} selectedId={selectedId} setQuery={setQuery} choose={choose} />{kind === 'chart' && <ChartPanel profile={profile} />}{kind === 'treatment' && <TreatmentPanel profile={profile} />}{kind === 'history' && <HistoryPanel profile={profile} />}{kind === 'notes' && <NotesPanel />}{kind === 'documents' && <DocumentsPanel profile={profile} />}</div></div>
 }
 
 function PatientPicker({ patients, query, loading, loadFailed, selectedId, setQuery, choose }: { patients: Patient[]; query: string; loading: boolean; loadFailed: boolean; selectedId: string; setQuery: (value: string) => void; choose: (id: string) => void }) {

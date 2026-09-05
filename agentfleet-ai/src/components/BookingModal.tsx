@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { X, User, Phone, Mail, Calendar, Clock, FileText, CheckCircle } from 'lucide-react'
+import { useDentalDashboardData } from '../hooks/useDentalDashboardData'
+import { appointmentBuffer, appointmentDuration, clinicTimeSlots } from '../utils/clinicSchedule'
 
 interface BookingModalProps {
   isOpen: boolean
@@ -19,9 +21,14 @@ export interface BookingFormData {
   appointmentType: string
   reason: string
   notes: string
+  duration?: number
 }
 
 export const BookingModal = ({ isOpen, onClose, onSubmit }: BookingModalProps) => {
+  const { settings } = useDentalDashboardData()
+  const clinicName = settings?.clinic_name || 'Dental Clinic'
+  const duration = appointmentDuration(settings)
+  const buffer = appointmentBuffer(settings)
   const [formData, setFormData] = useState<BookingFormData>({
     firstName: '',
     lastName: '',
@@ -46,10 +53,10 @@ export const BookingModal = ({ isOpen, onClose, onSubmit }: BookingModalProps) =
     'Teeth Whitening', 'Braces Adjustment', 'Emergency', 'Consultation'
   ]
 
-  const timeSlots = [
-    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'
-  ]
+  const timeSlots = useMemo(
+    () => clinicTimeSlots(settings?.working_hours, formData.appointmentDate || new Date(), duration, buffer),
+    [settings, formData.appointmentDate, duration, buffer],
+  )
 
   const validateForm = () => {
     const newErrors: Partial<BookingFormData> = {}
@@ -77,7 +84,7 @@ export const BookingModal = ({ isOpen, onClose, onSubmit }: BookingModalProps) =
     setSubmitError('')
 
     try {
-      await onSubmit(formData)
+      await onSubmit({ ...formData, duration })
       setShowSuccess(true)
 
       window.setTimeout(() => {
@@ -116,7 +123,7 @@ export const BookingModal = ({ isOpen, onClose, onSubmit }: BookingModalProps) =
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white">Book New Appointment</h2>
-              <p className="text-sky-100 text-sm">V.P.S. Dental & Oral Care</p>
+              <p className="text-sky-100 text-sm">{clinicName}</p>
             </div>
           </div>
           <button 
@@ -297,6 +304,7 @@ export const BookingModal = ({ isOpen, onClose, onSubmit }: BookingModalProps) =
                   ))}
                 </select>
                 {errors.appointmentTime && <p className="text-red-500 text-xs mt-1">{errors.appointmentTime}</p>}
+                {formData.appointmentDate && !timeSlots.length && <p className="text-rose-600 text-xs mt-1">The clinic is closed on this day. Choose another date or update hours in Settings.</p>}
               </div>
 
               {/* Appointment Type */}

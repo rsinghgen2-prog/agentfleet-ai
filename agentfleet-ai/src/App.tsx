@@ -26,6 +26,7 @@ import DentalClientShell from './components/dental/DentalClientShell'
 import Settings from './pages/Settings'
 import PatientConsultation from './pages/PatientConsultation'
 import ClinicalWorkspace from './pages/ClinicalWorkspace'
+import CommunicationsInbox from './components/dental/CommunicationsInbox'
 
 type UserType = 'client' | 'super-admin' | 'registered-user'
 
@@ -83,6 +84,17 @@ function LegacyTreatmentPlanRedirect() {
   if (appointment) query.set('appointment', appointment)
   if (patient) query.set('patient', patient)
   query.set('tab', 'plan')
+  return <Navigate to={patient || appointment ? `/dental-client/consultation?${query.toString()}` : '/dental-client/patients'} replace />
+}
+
+function LegacyDocumentsRedirect() {
+  const [params] = useSearchParams()
+  const patient = params.get('patient')
+  const appointment = params.get('appointment')
+  const query = new URLSearchParams()
+  if (appointment) query.set('appointment', appointment)
+  if (patient) query.set('patient', patient)
+  query.set('tab', 'documents')
   return <Navigate to={patient || appointment ? `/dental-client/consultation?${query.toString()}` : '/dental-client/patients'} replace />
 }
 
@@ -153,8 +165,8 @@ function App() {
               <Route path="dental-chart" element={<LegacyDentalChartRedirect />} />
               <Route path="treatment-plan" element={<LegacyTreatmentPlanRedirect />} />
               <Route path="medical-history" element={<LegacyMedicalHistoryRedirect />} />
-              <Route path="documents" element={<ClinicalWorkspace kind="documents" />} />
-              <Route path="communications" element={<ClinicalWorkspace kind="communications" />} />
+              <Route path="documents" element={<LegacyDocumentsRedirect />} />
+              <Route path="communications" element={<CommunicationsInbox />} />
             </Route>
             <Route path="/settings" element={
               <ProtectedRoute>

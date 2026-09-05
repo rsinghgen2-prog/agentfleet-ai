@@ -171,8 +171,18 @@ router.get('/settings', async (req: TenantRequest, res, next) => {
 router.put('/settings', async (req: TenantRequest, res, next) => {
   try {
     const s = quoteIdentifier(req.tenant!.schemaName)
-    const { clinicName, clinicEmail, phone, address, branding, workingHours, appointmentSettings, notifications, timezone } = req.body
+    const existing = await pool.query(`SELECT * FROM ${s}.clinic_settings WHERE id = TRUE`)
+    const current = existing.rows[0] || {}
+    const clinicName = typeof req.body.clinicName === 'string' ? req.body.clinicName : current.clinic_name
     if (typeof clinicName !== 'string' || !clinicName.trim()) return res.status(400).json({ success: false, message: 'clinicName is required' })
+    const clinicEmail = req.body.clinicEmail !== undefined ? req.body.clinicEmail : current.clinic_email
+    const phone = req.body.phone !== undefined ? req.body.phone : current.phone
+    const address = req.body.address !== undefined ? req.body.address : current.address || {}
+    const branding = req.body.branding !== undefined ? req.body.branding : current.branding || {}
+    const workingHours = req.body.workingHours !== undefined ? req.body.workingHours : current.working_hours || {}
+    const appointmentSettings = req.body.appointmentSettings !== undefined ? req.body.appointmentSettings : current.appointment_settings || {}
+    const notifications = req.body.notifications !== undefined ? req.body.notifications : current.notifications || {}
+    const timezone = req.body.timezone !== undefined ? req.body.timezone : current.timezone || 'Asia/Kolkata'
     const result = await pool.query(`INSERT INTO ${s}.clinic_settings (id, clinic_name, clinic_email, phone, address, branding, working_hours, appointment_settings, notifications, timezone, updated_by) VALUES (TRUE,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (id) DO UPDATE SET clinic_name=EXCLUDED.clinic_name, clinic_email=EXCLUDED.clinic_email, phone=EXCLUDED.phone, address=EXCLUDED.address, branding=EXCLUDED.branding, working_hours=EXCLUDED.working_hours, appointment_settings=EXCLUDED.appointment_settings, notifications=EXCLUDED.notifications, timezone=EXCLUDED.timezone, updated_by=EXCLUDED.updated_by, updated_at=NOW() RETURNING *`, [clinicName.trim(), clinicEmail || null, phone || null, address || {}, branding || {}, workingHours || {}, appointmentSettings || {}, notifications || {}, timezone || 'Asia/Kolkata', req.user?.userId || null])
     return res.json({ success: true, data: result.rows[0] })
   } catch (error) { next(error) }
