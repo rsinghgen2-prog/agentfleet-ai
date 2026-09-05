@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, ArrowLeft, CalendarDays, CheckCircle2, ChevronDown, Edit3, FileText, Heart, Mail, Phone, Printer, Share2, Upload, X } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { DashboardService, type Appointment, type PatientProfile } from '../services/dashboardService'
 
 type Action = 'back' | 'save' | 'complete'
@@ -15,8 +15,9 @@ const inputClass = 'mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white
 const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
 export default function PatientConsultation() {
-  const { appointmentId } = useParams<{ appointmentId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const appointmentId = searchParams.get('appointment')
   const [appointment, setAppointment] = useState<Appointment | null>(null)
   const [profile, setProfile] = useState<PatientProfile | null>(null)
   const [draft, setDraft] = useState(blankDraft)
@@ -33,7 +34,7 @@ export default function PatientConsultation() {
     const now = new Date(); const from = new Date(now); const to = new Date(now)
     from.setDate(from.getDate() - 365); to.setDate(to.getDate() + 365)
     void DashboardService.getAppointments(dateKey(from), dateKey(to)).then(async (appointments) => {
-      const current = appointments.find((item) => item.id === appointmentId)
+      const current = appointmentId ? appointments.find((item) => item.id === appointmentId) : appointments[0]
       if (!current) throw new Error('Appointment not found')
       const patientProfile = await DashboardService.getPatientProfile(current.patient_id)
       if (active) { setAppointment(current); setProfile(patientProfile); setDraft({ ...blankDraft, reason: current.reason || '', findings: current.diagnosis || '', notes: current.notes || '', treatment: typeof current.treatment_plan?.plan === 'string' ? current.treatment_plan.plan : '' }) }

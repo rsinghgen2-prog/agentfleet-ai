@@ -63,6 +63,26 @@ CREATE TABLE IF NOT EXISTS appointments (
   CHECK (status IN ('scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'))
 );
 
+CREATE TABLE IF NOT EXISTS treatment_plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  tooth VARCHAR(80) NOT NULL DEFAULT '',
+  status VARCHAR(30) NOT NULL DEFAULT 'recommended' CHECK (status IN ('recommended','accepted','scheduled','in_progress','completed','cancelled')),
+  priority VARCHAR(20) NOT NULL DEFAULT 'medium' CHECK (priority IN ('low','medium','high','urgent')),
+  estimated_cost NUMERIC(12,2), due_date DATE, notes TEXT NOT NULL DEFAULT '',
+  created_by UUID REFERENCES users(id), updated_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS patient_tooth_records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  tooth_number SMALLINT NOT NULL CHECK (tooth_number BETWEEN 11 AND 48), conditions JSONB NOT NULL DEFAULT '[]'::jsonb,
+  pain_level INTEGER NOT NULL DEFAULT 0 CHECK (pain_level BETWEEN 0 AND 10), status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active','resolved','monitoring')),
+  notes TEXT NOT NULL DEFAULT '', created_by UUID REFERENCES users(id), updated_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(patient_id, tooth_number)
+);
+
 CREATE TABLE IF NOT EXISTS clinic_settings (
   id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
   clinic_name VARCHAR(255) NOT NULL,
@@ -258,8 +278,27 @@ CREATE TABLE IF NOT EXISTS payments (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), customer_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  payment_id UUID REFERENCES payments(id) ON DELETE SET NULL, invoice_number VARCHAR(80) NOT NULL UNIQUE,
+  currency VARCHAR(3) NOT NULL DEFAULT 'INR', status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','issued','paid','void','overdue')),
+  due_date DATE, notes TEXT NOT NULL DEFAULT '', line_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+  total_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (total_amount >= 0), created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS message_campaigns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name VARCHAR(160) NOT NULL,
+  channel VARCHAR(20) NOT NULL CHECK (channel IN ('whatsapp','sms')), subject VARCHAR(255) NOT NULL DEFAULT '',
+  message TEXT NOT NULL, recipients JSONB NOT NULL DEFAULT '[]'::jsonb,
+  status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','scheduled','queued','cancelled','completed')),
+  scheduled_at TIMESTAMPTZ, created_by UUID REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_payments_customer ON payments (customer_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices (customer_id, status, due_date);
+CREATE INDEX IF NOT EXISTS idx_message_campaigns_status ON message_campaigns (status, scheduled_at, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_patient ON prescriptions (patient_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_patient_reports_patient ON patient_reports (patient_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_lab_orders_patient ON lab_orders (patient_id, created_at DESC);
@@ -294,3 +333,7 @@ DROP TRIGGER IF EXISTS lab_order_dispatches_updated_at ON lab_order_dispatches;
 CREATE TRIGGER lab_order_dispatches_updated_at BEFORE UPDATE ON lab_order_dispatches FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS payments_updated_at ON payments;
 CREATE TRIGGER payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS invoices_updated_at ON invoices;
+CREATE TRIGGER invoices_updated_at BEFORE UPDATE ON invoices FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS message_campaigns_updated_at ON message_campaigns;
+CREATE TRIGGER message_campaigns_updated_at BEFORE UPDATE ON message_campaigns FOR EACH ROW EXECUTE FUNCTION set_updated_at();
