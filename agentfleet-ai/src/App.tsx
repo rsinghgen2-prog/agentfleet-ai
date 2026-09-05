@@ -161,7 +161,7 @@ function App() {
               <Route path="settings" element={<DentalClientSettings />} />
               <Route path="consultation" element={<PatientConsultation />} />
               <Route path="client-consulation" element={<PatientConsultation />} />
-              <Route path="clinical-notes" element={<ClinicalWorkspace kind="notes" />} />
+              <Route path="clinical-notes" element={<ClinicalWorkspace />} />
               <Route path="dental-chart" element={<LegacyDentalChartRedirect />} />
               <Route path="treatment-plan" element={<LegacyTreatmentPlanRedirect />} />
               <Route path="medical-history" element={<LegacyMedicalHistoryRedirect />} />

@@ -113,7 +113,6 @@ export function patientInitials(person: { first_name?: string | null; last_name?
 }
 
 export const WEEKDAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
-export type WeekdayKey = typeof WEEKDAY_KEYS[number]
 export type DayHours = { open: boolean; start: string; end: string }
 
 export const DEFAULT_WORKING_HOURS: Record<string, string> = {
