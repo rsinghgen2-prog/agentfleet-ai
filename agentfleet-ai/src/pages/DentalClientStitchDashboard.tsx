@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, Plus, Search, SmilePlus } from 'lucide-react'
+import { ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { BookingModal, type BookingFormData } from '../components/BookingModal'
 import DentistNotes from '../components/DentistNotes'
@@ -162,9 +162,11 @@ export default function DentalClientStitchDashboard() {
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
         <div className="flex flex-col gap-5 xl:col-span-8">
-          <section className="dental-stitch-card relative grid grid-cols-1 items-center gap-6 overflow-hidden p-5 sm:grid-cols-2 sm:p-7">
+          <section className="dental-stitch-card relative grid grid-cols-1 items-stretch gap-6 overflow-hidden p-5 sm:grid-cols-2 sm:p-7">
             <div className="relative z-10"><p className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-[#424752]">Today's patient visits</p><div className="flex items-baseline gap-2"><span className="text-5xl font-bold tracking-tight text-[#151c23]">{visitsLabel}</span><span className="text-sm text-[#424752]">/person</span></div><div className="mt-6 grid grid-cols-2 gap-3"><div className="relative overflow-hidden rounded-2xl border border-[#79baf2] bg-gradient-to-br from-[#eff8ff] via-[#cce9ff] to-[#8ec8ff] p-4 shadow-sm"><span className="absolute -right-4 -top-5 h-16 w-16 rounded-full bg-white/40" /><span className="relative text-xs font-bold text-[#005db6]">New Patients</span><div className="relative mt-2 flex items-center justify-between"><b className="text-2xl text-[#005db6]">{newPatientsLabel}</b><span className="rounded-full bg-[#005db6] px-2 py-1 text-[10px] font-bold text-white">51% ↗</span></div></div><div className="relative overflow-hidden rounded-2xl border border-[#e99ab3] bg-gradient-to-br from-[#fff0f5] via-[#ffd5e2] to-[#f3a2bc] p-4 shadow-sm"><span className="absolute -bottom-6 -right-3 h-16 w-16 rounded-full bg-white/40" /><span className="relative text-xs font-bold text-[#a23858]">Returning</span><div className="relative mt-2 flex items-center justify-between"><b className="text-2xl text-[#a23858]">{returningLabel}</b><span className="rounded-full bg-[#a23858] px-2 py-1 text-[10px] font-bold text-white">51% ↘</span></div></div></div></div>
-            <div className="hidden h-48 items-center justify-center sm:flex"><div className="relative flex h-40 w-40 items-center justify-center rounded-full border-[18px] border-[#e2e9f2] bg-[#f7f9ff] shadow-inner"><SmilePlus size={92} strokeWidth={1.1} className="text-[#005db6]" /><span className="absolute -right-5 top-3 h-7 w-7 rounded-full bg-[#fe81a1]" /><span className="absolute -bottom-2 left-1 h-5 w-5 rounded-full bg-[#5897f4]" /></div></div>
+            <div className="relative hidden min-h-[13.5rem] overflow-hidden rounded-3xl sm:block">
+              <img src="/images/dashboard-tooth.jpg" alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
+            </div>
           </section>
 
           <section className="dental-stitch-card flex items-center justify-between bg-[#edf4fe] p-5">

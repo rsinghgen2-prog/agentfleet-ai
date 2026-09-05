@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { Calendar, CalendarDays, CircleHelp, Grid2X2, LogOut, Menu, MessageSquare, Moon, Package, Receipt, Search, Settings, Smile, Sun, Users } from 'lucide-react'
 import { useDentalDashboardData, clearDentalDashboardCache } from '../../hooks/useDentalDashboardData'
+import { isClinicLogoImage } from '../../utils/clinicLogo'
 import { useTheme } from '../../context/ThemeContext'
 import DentalSupportChat from './DentalSupportChat'
 import DentalNotificationCenter from './DentalNotificationCenter'
@@ -37,6 +38,7 @@ export default function DentalClientShell() {
     } catch { return 'Dr. Rajeev Pratap Singh' }
   })()
   const clinicName = settings?.clinic_name || client?.brandName || 'Dental Clinic'
+  const clinicLogo = settings?.branding?.logo
   const primaryColor = settings?.branding?.primaryColor || client?.primaryColor || '#005db6'
   const initials = clientName.split(' ').map((part: string) => part[0]).join('').slice(0, 2)
 
@@ -67,7 +69,11 @@ export default function DentalClientShell() {
     <div className="dental-stitch-app flex min-h-screen" style={{ '--tenant-primary': primaryColor } as CSSProperties}>
       <aside className="fixed inset-y-0 left-0 z-50 hidden w-56 flex-col border-r border-slate-200 bg-white md:flex">
         <div className="flex items-center gap-2 px-5 py-5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-600 text-white"><Smile size={20} /></div>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sky-600 text-white">
+            {isClinicLogoImage(clinicLogo)
+              ? <img src={clinicLogo} alt="" className="h-full w-full object-contain bg-white" />
+              : <Smile size={20} />}
+          </div>
           <div className="leading-tight"><p className="text-sm font-bold text-sky-700">{clinicName}</p><p className="text-[11px] text-slate-400">Dental Clinic</p></div>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 px-3">

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Bell, Building2, CalendarDays, Check, CheckCheck, Clock3, LockKeyhole, Mail, MapPin, MessageCircle, Moon, PhoneCall, Save, Search, ShieldCheck, Sun } from 'lucide-react'
+import { Bell, Building2, CalendarDays, Check, CheckCheck, Clock3, ImagePlus, LockKeyhole, Mail, MapPin, MessageCircle, Moon, PhoneCall, Save, Search, ShieldCheck, Smile, Sun } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useDentalDashboardData } from '../hooks/useDentalDashboardData'
 import { DashboardService, type HospitalDirectory, type NotificationAlert } from '../services/dashboardService'
 import { describeApiError } from '../utils/apiError'
+import { compressClinicLogo, isClinicLogoImage } from '../utils/clinicLogo'
 import { WEEKDAY_KEYS, appointmentBuffer, appointmentDuration, parseDayHours, serializeDayHours, type DayHours } from '../utils/clinicSchedule'
 
 const weekdayLabels: Record<(typeof WEEKDAY_KEYS)[number], string> = {
@@ -35,6 +36,7 @@ export default function DentalClientSettings() {
   const { theme, toggleTheme } = useTheme()
   const { client, settings, refresh } = useDentalDashboardData()
   const [clinicName, setClinicName] = useState('')
+  const [logo, setLogo] = useState('')
   const [clinicEmail, setClinicEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [line1, setLine1] = useState('')
@@ -59,6 +61,7 @@ export default function DentalClientSettings() {
 
   useEffect(() => {
     setClinicName(settings?.clinic_name || client?.brandName || '')
+    setLogo(settings?.branding?.logo || '')
     setClinicEmail(settings?.clinic_email || '')
     setPhone(settings?.phone || '')
     setLine1(String(settings?.address?.line1 || settings?.address?.address || ''))
@@ -111,6 +114,18 @@ export default function DentalClientSettings() {
     setHours((current) => ({ ...current, [day]: { ...current[day], ...patch } }))
   }
 
+  const uploadLogo = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setError('')
+    try {
+      setLogo(await compressClinicLogo(file))
+    } catch (reason) {
+      setError(describeApiError(reason, 'Unable to use that logo.'))
+    }
+  }
+
   const save = async () => {
     if (!clinicName.trim()) { setError('Clinic name is required.'); return }
     setSaving(true); setSaved(false); setError('')
@@ -122,7 +137,7 @@ export default function DentalClientSettings() {
         phone: phone.trim(),
         timezone,
         address: { line1: line1.trim(), city: city.trim(), state: state.trim(), postalCode: postalCode.trim(), country: settings?.address?.country || 'India' },
-        branding: settings?.branding || {},
+        branding: { ...(settings?.branding || {}), logo: logo.trim() },
         workingHours,
         appointmentSettings: { duration, bufferMinutes, emergencySlots },
         notifications: { emailAlerts, smsReminders, messageAlerts, callAlerts },
@@ -164,6 +179,26 @@ export default function DentalClientSettings() {
           <section className="dental-stitch-card p-5 sm:p-6">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#005db6]">Clinic profile</p>
             <h2 className="mt-1 text-lg font-bold text-[#151c23]">How this clinic appears</h2>
+            <div className="mt-4 flex items-center gap-4 rounded-2xl border border-[#c2c6d4]/40 bg-[#f7f9ff] p-3">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-sky-600 text-white">
+                {isClinicLogoImage(logo)
+                  ? <img src={logo} alt="" className="h-full w-full object-contain bg-white" />
+                  : <Smile size={28} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-[#151c23]">Clinic logo</p>
+                <p className="mt-0.5 text-xs text-[#727783]">Replaces the icon at the top of the left menu after you save.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[#005db6] px-3 py-2 text-xs font-bold text-white">
+                    <ImagePlus size={14} /> Upload logo
+                    <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={(event) => void uploadLogo(event)} />
+                  </label>
+                  {isClinicLogoImage(logo) && (
+                    <button type="button" onClick={() => setLogo('')} className="rounded-lg border border-[#c2c6d4]/60 bg-white px-3 py-2 text-xs font-bold text-[#424752]">Remove</button>
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-semibold text-[#727783]">Clinic name<input value={clinicName} onChange={(event) => setClinicName(event.target.value)} className={inputClass} /></label>
               <label className="text-xs font-semibold text-[#727783]">Clinic email<input type="email" value={clinicEmail} onChange={(event) => setClinicEmail(event.target.value)} className={inputClass} /></label>
