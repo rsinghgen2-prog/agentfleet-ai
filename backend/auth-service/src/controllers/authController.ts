@@ -41,7 +41,7 @@ export class AuthController {
       const schema = quoteIdentifier(tenant.schema_name);
       const passwordHash = await bcrypt.hash(newPassword, 12);
       const result = await pool.query(`UPDATE ${schema}.users SET password_hash = $1, failed_login_attempts = 0, updated_at = NOW() WHERE LOWER(email) = LOWER($2) AND is_active RETURNING id`, [passwordHash, email.trim()]);
-      if (!result.rowCount) return res.status(404).json({ success: false, message: 'Active user not found' });
+      if (!result.rowCount) return res.status(404).json({ success: false, message: 'This email is not associated with the selected tenant' });
       return res.json({ success: true, message: 'Password reset successfully' });
     } catch (error) {
       logger.error('Password reset error:', error);
