@@ -6,9 +6,9 @@ import { SUPER_ADMIN, validateSuperAdmin } from '../config/superAdmin'
 import { getClientByEmail, validateClient } from '../config/clients'
 import { useTheme } from '../context/ThemeContext'
 import { decodeJWT, jwtToUserRegistration } from '../utils/jwtUtils'
+import { AUTH_API_URL } from '../config/api'
 
-const DEMO_MODE = import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === 'true'
-const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '')
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
 
 const getAuthErrorMessage = (reason: unknown) => {
   const message = reason instanceof Error ? reason.message : 'Unable to reach authentication service'
@@ -82,8 +82,9 @@ const Login = () => {
     if (client) {
       let authenticated = false
       let accessToken: string = ''
+      let authFullName = ''
       try {
-        if (!AUTH_API_URL) {
+        if (!import.meta.env.DEV && !AUTH_API_URL) {
           throw new Error('Authentication service URL is not configured')
         }
         const authResponse = await fetch(`${AUTH_API_URL}/api/v1/auth/login`, {
@@ -94,6 +95,7 @@ const Login = () => {
         const authBody = await authResponse.json().catch(() => ({}))
         if (authResponse.ok && authBody.data?.tokens?.accessToken) {
           accessToken = authBody.data.tokens.accessToken || ''
+          authFullName = authBody.data?.user?.fullName || ''
           localStorage.setItem('accessToken', accessToken)
           if (authBody.data.tokens.refreshToken) localStorage.setItem('refreshToken', authBody.data.tokens.refreshToken)
           authenticated = true
@@ -117,12 +119,16 @@ const Login = () => {
         if (payload) {
           const userRegistration = jwtToUserRegistration(payload)
           localStorage.setItem('userRegistration', JSON.stringify(userRegistration))
+          authFullName = authFullName || userRegistration.fullName || ''
         }
       }
       
       localStorage.setItem('isLoggedIn', 'true')
       localStorage.setItem('userType', 'client')
-      localStorage.setItem('clientData', JSON.stringify(client))
+      localStorage.setItem('clientData', JSON.stringify({
+        ...client,
+        clientName: client.clientName || authFullName || 'Doctor',
+      }))
       localStorage.setItem('currentUser', email)
 
       // Route to appropriate client dashboard based on dashboard type
@@ -133,7 +139,7 @@ const Login = () => {
 
     // 3. Try tenant user login (from database, not pre-configured)
     try {
-      if (!AUTH_API_URL) {
+      if (!import.meta.env.DEV && !AUTH_API_URL) {
         throw new Error('Authentication service URL is not configured')
       }
       
@@ -186,8 +192,10 @@ const Login = () => {
       }
       
       localStorage.setItem('isLoggedIn', 'true')
-      localStorage.setItem('userType', 'tenant-user')
+      localStorage.setItem('userType', 'client')
       localStorage.setItem('currentUser', email)
+      const matchedClient = getClientByEmail(email)
+      if (matchedClient) localStorage.setItem('clientData', JSON.stringify(matchedClient))
       navigate('/dental-client')
       return
     } catch (authError) {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Edit3, Plus, Save, Trash2, X } from 'lucide-react'
 import { DashboardService, type DentistNote, type DentistNoteInput } from '../services/dashboardService'
+import { describeApiError } from '../utils/apiError'
 
 type NoteDraft = Pick<DentistNote, 'title' | 'content'> & { expiresAt: string }
 
@@ -24,7 +25,7 @@ export default function DentistNotes() {
     try {
       setNotes(await DashboardService.getDentistNotes())
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to load dentist notes')
+      setError(describeApiError(reason, 'Unable to load dentist notes from the backend.'))
     } finally {
       setLoading(false)
     }
@@ -75,7 +76,7 @@ export default function DentistNotes() {
       setNotes((current) => editingId ? current.map((note) => note.id === saved.id ? saved : note) : [saved, ...current])
       closeEditor()
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save dentist note')
+      setError(describeApiError(reason, 'Unable to save dentist note'))
     } finally {
       setSaving(false)
     }
@@ -90,7 +91,7 @@ export default function DentistNotes() {
       setNotes((current) => current.filter((item) => item.id !== note.id))
       if (editingId === note.id) closeEditor()
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to delete dentist note')
+      setError(describeApiError(reason, 'Unable to delete dentist note'))
     } finally {
       setDeletingId(null)
     }
@@ -101,7 +102,7 @@ export default function DentistNotes() {
       <div><h2 className="text-xl font-semibold">Dentist Notes</h2><p className="mt-1 text-xs text-[#727783]">Clinical reminders and follow-ups for your practice.</p></div>
       <button type="button" onClick={openNewNote} className="flex shrink-0 items-center gap-1 rounded-full bg-[#e8eef8] px-3 py-2 text-xs font-bold text-[#005db6]"><Plus size={16} /> Add note</button>
     </div>
-    {error && <div role="alert" className="mt-4 rounded-xl border border-[#a23858]/20 bg-[#fe81a1]/10 p-3 text-xs text-[#761538]">{error}</div>}
+    {error && <div role="alert" className="mt-4 rounded-xl border border-[#a23858]/20 bg-[#fe81a1]/10 p-3 text-xs text-[#761538]">{error}<button type="button" onClick={() => void loadNotes()} className="ml-2 font-bold underline">Retry</button></div>}
     {editorOpen && <form onSubmit={saveNote} className="mt-4 space-y-3 rounded-2xl border border-[#5897f4]/30 bg-[#f7f9ff] p-4">
       <div className="flex items-center justify-between"><h3 className="text-sm font-bold text-[#151c23]">{editingId ? 'Edit note' : 'Add note'}</h3><button type="button" onClick={closeEditor} aria-label="Close note editor" className="rounded-full p-1 text-[#727783] hover:bg-white"><X size={16} /></button></div>
       <input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} maxLength={160} placeholder="Note title" className="h-10 w-full rounded-xl border border-[#c2c6d4]/40 bg-white px-3 text-sm text-[#151c23] outline-none focus:ring-2 focus:ring-[#005db6]/20" />
@@ -111,7 +112,7 @@ export default function DentistNotes() {
     </form>}
     <div className="mt-4 space-y-3">
       {loading && <p className="text-sm text-[#727783]">Loading notes…</p>}
-      {!loading && notes.length === 0 && <p className="rounded-2xl bg-[#f7f9ff] p-4 text-sm text-[#727783]">No dentist notes yet. Add your first note to keep clinical reminders together.</p>}
+      {!loading && notes.length === 0 && <p className="rounded-2xl bg-[#f7f9ff] p-4 text-sm text-[#727783]">{error ? 'Dentist notes could not be loaded from the backend.' : 'No dentist notes yet. Add your first note to keep clinical reminders together.'}</p>}
       {!loading && notes.map((note) => <article key={note.id} className="rounded-2xl border border-[#c2c6d4]/30 bg-[#f7f9ff] p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-bold text-[#151c23]">{note.title}</h3><p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-[#424752]">{note.content}</p><time className="mt-2 block text-[10px] text-[#727783]">Updated {formatNoteDate(note.updated_at)} · Expires {formatNoteDate(note.expires_at)}</time></div><div className="flex shrink-0 gap-1"><button type="button" onClick={() => openEditNote(note)} aria-label={`Edit ${note.title}`} className="rounded-full p-2 text-[#005db6] hover:bg-white"><Edit3 size={15} /></button><button type="button" onClick={() => void deleteNote(note)} disabled={deletingId === note.id} aria-label={`Delete ${note.title}`} className="rounded-full p-2 text-[#a23858] hover:bg-white disabled:opacity-50"><Trash2 size={15} /></button></div></div></article>)}
     </div>
   </section>

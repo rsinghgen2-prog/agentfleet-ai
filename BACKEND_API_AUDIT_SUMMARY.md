@@ -334,13 +334,7 @@ test('e2e: mobile app booking flow', async () => {
 
 ## Conclusion
 
-The Patient Booking API is **production-ready** and can be safely used by:
-- ✅ Mobile apps (iOS, Android)
-- ✅ Web portals (React, Vue, etc.)
-- ✅ Third-party integrations (Zapier, Make, etc.)
-- ✅ Kiosks (any HTTP client with JWT)
-
-Duplicate detection via email/phone is working correctly. The latest improvement (commit `b4fef3d`) provides clear feedback to clients on whether a patient was newly created or reused.
+The Patient Booking API is a clinic booking surface, not a finished production product. Slot overlap, identity uniqueness, and queued-comms honesty still need operator review before exposing it to third parties.
 
 **Recommendation:** Deploy and start accepting bookings immediately. Monitor for:
 - Booking volume (target: 0.5-1 booking/minute per clinic)

@@ -52,7 +52,7 @@ export function jwtToUserRegistration(payload: JWTPayload) {
   return {
     userId: payload.userId,
     email: payload.email,
-    fullName: payload.fullName || `${payload.firstName || ''} ${payload.lastName || ''}`.trim() || payload.email,
+    fullName: payload.fullName || payload.full_name || `${payload.firstName || payload.first_name || ''} ${payload.lastName || payload.last_name || ''}`.trim() || payload.email || 'Doctor',
     firstName: payload.firstName || payload.fullName?.split(' ')[0] || '',
     lastName: payload.lastName || payload.fullName?.split(' ').slice(1).join(' ') || '',
     role: payload.role,

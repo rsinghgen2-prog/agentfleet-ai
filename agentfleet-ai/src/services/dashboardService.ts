@@ -1,5 +1,7 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3010'
-const DEMO_MODE = import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === 'true'
+import { ApiError } from '../utils/apiError'
+import { API_BASE_URL, AUTH_API_URL } from '../config/api'
+
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
 
 export interface Patient { id: string; first_name: string; last_name: string; phone?: string; email?: string; gender?: string; date_of_birth?: string; notes?: string; medical_history?: Record<string, unknown>; allergies?: string[]; dental_history?: Record<string, unknown>; last_visit?: string | null; next_appointment?: string | null }
 export interface Appointment { id: string; patient_id: string; appointment_date: string; appointment_time: string; duration: number; appointment_type: string; status: string; reason: string; notes: string; diagnosis?: string | null; treatment_plan?: Record<string, unknown> | null; first_name: string; last_name: string; phone: string; email?: string; gender: string }
@@ -27,6 +29,37 @@ export interface HospitalDirectory { id: string; name: string; relationship: 'ow
 export interface NotificationAlert { id: string; kind: 'message' | 'email' | 'call'; title: string; body: string; customer_name?: string | null; is_read: boolean; created_at: string }
 export interface ClinicSettings { clinic_name: string; clinic_email?: string; phone?: string; address: Record<string, unknown>; branding: Record<string, string>; working_hours: Record<string, string>; appointment_settings: Record<string, unknown>; notifications: Record<string, boolean>; timezone: string }
 export interface DashboardData { todaysAppointments: Appointment[]; calendarData: Array<{ appointment_date: string; count: number }>; upcomingFollowUps?: Patient[]; stats: { todayVisits: number; newPatientsToday: number; totalAppointmentsToday: number; totalPatients: number }; currentDate: { month: number; year: number; today: string } }
+
+const asCount = (...values: unknown[]) => {
+  for (const value of values) {
+    if (value === null || value === undefined || value === '') continue
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
+}
+
+function normalizeDashboardData(raw: Record<string, unknown> | DashboardData | null | undefined): DashboardData {
+  const source = (raw || {}) as Record<string, unknown>
+  const stats = (source.stats || {}) as Record<string, unknown>
+  const currentDate = (source.currentDate || source.current_date || {}) as Record<string, unknown>
+  return {
+    todaysAppointments: Array.isArray(source.todaysAppointments) ? source.todaysAppointments as Appointment[] : [],
+    calendarData: Array.isArray(source.calendarData) ? source.calendarData as DashboardData['calendarData'] : Array.isArray(source.calendar_data) ? source.calendar_data as DashboardData['calendarData'] : [],
+    upcomingFollowUps: Array.isArray(source.upcomingFollowUps) ? source.upcomingFollowUps as Patient[] : Array.isArray(source.upcoming_follow_ups) ? source.upcoming_follow_ups as Patient[] : [],
+    stats: {
+      todayVisits: asCount(stats.todayVisits, stats.today_visits),
+      newPatientsToday: asCount(stats.newPatientsToday, stats.new_patients_today),
+      totalAppointmentsToday: asCount(stats.totalAppointmentsToday, stats.total_appointments_today),
+      totalPatients: asCount(stats.totalPatients, stats.total_patients),
+    },
+    currentDate: {
+      month: asCount(currentDate.month, new Date().getMonth() + 1) || new Date().getMonth() + 1,
+      year: asCount(currentDate.year, new Date().getFullYear()) || new Date().getFullYear(),
+      today: typeof currentDate.today === 'string' && currentDate.today ? currentDate.today : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`,
+    },
+  }
+}
 export interface PatientVisit { id: string; visit_date: string; appointment_time?: string; provider: string; visit_type: string; status: string; summary: string; procedures?: string[]; is_appointment?: boolean }
 export interface PatientPrescription { id: string; patient_id: string; medication: string; dosage: string; frequency: string; duration: string; instructions: string; prescribed_at: string; prescribed_by: string }
 export interface PatientMedicalReport { id: string; patient_id: string; file_name: string; mime_type: string; file_size: number; data_base64: string; description?: string; uploaded_at: string; uploaded_by: string }
@@ -37,6 +70,7 @@ export interface PatientProfile { patient: Patient; visits: PatientVisit[]; pres
 export interface PrescriptionInput { patientId: string; medication: string; dosage: string; frequency: string; duration: string; instructions: string }
 export interface PrescriptionUpdateInput extends PrescriptionInput { prescriptionId: string }
 export interface PatientUpdateInput { firstName?: string; lastName?: string; email?: string | null; phone?: string | null; dateOfBirth?: string | null; gender?: string | null; notes?: string | null; medicalHistory?: Record<string, unknown>; allergies?: string[]; dentalHistory?: Record<string, unknown> }
+export interface PatientCreateInput { firstName: string; lastName: string; email?: string | null; phone?: string | null; dateOfBirth?: string | null; gender?: string | null; notes?: string | null }
 export interface MedicalReportInput { patientId: string; fileName: string; mimeType: string; fileSize: number; dataBase64: string; description?: string }
 export interface LabOrderInput { patientId: string; orderNumber?: string; tests: string; teethCreationService: string; labName: string; labEmail: string; labPhone: string; instructions: string; copyToPatient: boolean; copyToClinic: boolean }
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
@@ -234,17 +268,58 @@ function getDemoDashboardData(): DashboardData {
 }
 
 export class DashboardService {
+  private static refreshInFlight: Promise<boolean> | null = null
+
+  private static async refreshAccessToken() {
+    if (this.refreshInFlight) return this.refreshInFlight
+    this.refreshInFlight = (async () => {
+      const refreshToken = localStorage.getItem('refreshToken')
+      if (!refreshToken) return false
+      const response = await fetch(`${AUTH_API_URL}/api/v1/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken }) })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok || !body.data?.accessToken) {
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        return false
+      }
+      localStorage.setItem('accessToken', body.data.accessToken)
+      return true
+    })()
+    try { return await this.refreshInFlight } finally { this.refreshInFlight = null }
+  }
+
+  private static async fetchJson(path: string, options: RequestInit = {}, retried = false): Promise<{ ok: boolean; status: number; body: Record<string, unknown> }> {
+    let response: Response
+    try {
+      const token = localStorage.getItem('accessToken')
+      response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } })
+    } catch (error) {
+      throw new ApiError('The clinic API is unreachable. Confirm the patient service is running and VITE_API_URL is set.', 0)
+    }
+    const body = await response.json().catch(() => ({})) as Record<string, unknown>
+    if (response.status === 401 && !retried && await this.refreshAccessToken()) return this.fetchJson(path, options, true)
+    return { ok: response.ok, status: response.status, body }
+  }
+
   private static async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } })
-    const body = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(body.message || `Request failed (${response.status})`)
-    if (!Object.prototype.hasOwnProperty.call(body, 'data')) throw new Error('API returned an invalid response')
+    const { ok, status, body } = await this.fetchJson(path, options)
+    if (!ok) throw new ApiError(typeof body.message === 'string' ? body.message : `Request failed (${status || 'network'})`, status)
+    if (!Object.prototype.hasOwnProperty.call(body, 'data')) throw new ApiError('API returned an invalid response', status)
     return body.data as T
   }
 
-  static async getDashboardData(): Promise<DashboardData> { try { return await this.request<DashboardData>('/api/v1/patients/dashboard') } catch (error) { if (!DEMO_MODE) throw error; console.warn('Using explicit demo dashboard data', error); return getDemoDashboardData() } }
+  static async getDashboardData(): Promise<DashboardData> { try { return normalizeDashboardData(await this.request<Record<string, unknown>>('/api/v1/patients/dashboard')) } catch (error) { if (!DEMO_MODE) throw error; console.warn('Using explicit demo dashboard data', error); return getDemoDashboardData() } }
   static async getPatients(search = '', limit = 25, offset = 0): Promise<{ data: Patient[]; total: number }> { try { const query = new URLSearchParams({ limit: String(limit), offset: String(offset), ...(search ? { search } : {}) }); const response = await this.requestBody<{ data: Patient[]; meta?: { total?: number } }>(`/api/v1/patients/patients?${query}`); return { data: response.data, total: response.meta?.total ?? response.data.length } } catch (error) { if (!DEMO_MODE) throw error; const needle = search.toLowerCase(); const filtered = getDemoPatients().filter((patient) => `${patient.first_name} ${patient.last_name} ${patient.phone} ${patient.email}`.toLowerCase().includes(needle)); return { data: filtered.slice(offset, offset + limit), total: filtered.length } } }
+  static async createPatient(input: PatientCreateInput): Promise<Patient> {
+    try {
+      return await this.request<Patient>('/api/v1/patients/patients', { method: 'POST', body: JSON.stringify(input) })
+    } catch (error) {
+      if (!DEMO_MODE) throw error
+      const patient: Patient = { id: `demo-patient-${Date.now()}`, first_name: input.firstName, last_name: input.lastName, phone: input.phone || undefined, email: input.email || undefined, gender: input.gender || undefined, date_of_birth: input.dateOfBirth || undefined, notes: input.notes || undefined, last_visit: null, next_appointment: null }
+      writeDemoCollection(DEMO_PATIENTS_KEY, [patient, ...getDemoPatients()])
+      return patient
+    }
+  }
   static async updatePatient(id: string, changes: PatientUpdateInput): Promise<Patient> { try { return await this.request<Patient>(`/api/v1/patients/patients/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(changes) }) } catch (error) { if (!DEMO_MODE) throw error; const current = getDemoPatients(); const existing = current.find((item) => item.id === id); if (!existing) throw new Error('Patient not found'); const updated = { ...existing, first_name: changes.firstName ?? existing.first_name, last_name: changes.lastName ?? existing.last_name, email: changes.email === undefined ? existing.email : changes.email || undefined, phone: changes.phone === undefined ? existing.phone : changes.phone || undefined, date_of_birth: changes.dateOfBirth === undefined ? existing.date_of_birth : changes.dateOfBirth || undefined, notes: changes.notes === undefined ? existing.notes : changes.notes || undefined }; writeDemoCollection(DEMO_PATIENTS_KEY, current.map((item) => item.id === id ? updated : item)); const profiles = getDemoPatientProfiles().map((item) => item.patient.id === id ? { ...item, patient: { ...item.patient, ...updated } } : item); writeDemoCollection(DEMO_PATIENT_PROFILES_KEY, profiles); return updated } }
   static async getPatientProfile(id: string): Promise<PatientProfile> { try { const raw = await this.request<{ patient: Patient; appointments?: Array<Record<string, unknown>>; prescriptions?: Array<Record<string, unknown>>; reports?: Array<Record<string, unknown>>; labOrders?: Array<Record<string, unknown>>; dispatchHistory?: Array<Record<string, unknown>> }>(`/api/v1/patients/patients/${encodeURIComponent(id)}/profile`); return normalizePatientProfile(raw) } catch (error) { if (!DEMO_MODE) throw error; return getDemoPatientProfile(id) } }
   static async getPrescriptions(patientId: string): Promise<PatientPrescription[]> { try { const result = await this.request<Record<string, unknown>[]>(`/api/v1/patients/patients/${encodeURIComponent(patientId)}/prescriptions`); return normalizePatientProfile({ patient: {} as Patient, prescriptions: result }).prescriptions } catch (error) { if (!DEMO_MODE) throw error; return (await this.getPatientProfile(patientId)).prescriptions } }
@@ -280,6 +355,7 @@ export class DashboardService {
     }
   }
   static async updateAppointment(id: string, changes: AppointmentUpdateInput): Promise<Appointment> { try { return await this.request<Appointment>(`/api/v1/patients/appointments/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(changes) }) } catch (error) { if (!DEMO_MODE) throw error; const current = getDemoAppointments(); const existing = current.find((item) => item.id === id); if (!existing) throw new Error('Appointment not found'); const updated = { ...existing, appointment_date: changes.appointmentDate ?? existing.appointment_date, appointment_time: changes.appointmentTime ?? existing.appointment_time, duration: changes.duration ?? existing.duration, appointment_type: changes.appointmentType ?? existing.appointment_type, status: changes.status ?? existing.status, reason: changes.reason ?? existing.reason, notes: changes.notes ?? existing.notes }; writeDemoCollection(DEMO_APPOINTMENTS_KEY, current.map((item) => item.id === id ? updated : item)); const patientAppointments = current.map((item) => item.id === id ? updated : item).filter((item) => item.patient_id === updated.patient_id); const nextAppointment = patientAppointments.filter((item) => !['cancelled', 'completed'].includes(item.status) && item.appointment_date >= today).sort((a, b) => `${a.appointment_date} ${a.appointment_time}`.localeCompare(`${b.appointment_date} ${b.appointment_time}`))[0]?.appointment_date || null; const patients = getDemoPatients(); writeDemoCollection(DEMO_PATIENTS_KEY, patients.map((patient) => patient.id === updated.patient_id ? { ...patient, next_appointment: nextAppointment } : patient)); return updated } }
+  static async getAppointment(id: string): Promise<Appointment> { try { return await this.request<Appointment>(`/api/v1/patients/appointments/${encodeURIComponent(id)}`) } catch (error) { if (!DEMO_MODE) throw error; const found = getDemoAppointments().find((item) => item.id === id); if (!found) throw new Error('Appointment not found'); return found } }
   static async getAppointments(from: string, to: string): Promise<Appointment[]> { try { return await this.request<Appointment[]>(`/api/v1/patients/appointments?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`) } catch (error) { if (!DEMO_MODE) throw error; return getDemoAppointments().filter((appointment) => appointment.appointment_date >= from && appointment.appointment_date <= to) } }
   static async getTodaysAppointments(): Promise<Appointment[]> { try { return await this.request<Appointment[]>('/api/v1/patients/appointments/today') } catch (error) { if (!DEMO_MODE) throw error; return getDemoAppointments().filter((appointment) => appointment.appointment_date === today) } }
   static async getDentistNotes(): Promise<DentistNote[]> { try { return await this.request<DentistNote[]>('/api/v1/patients/notes') } catch (error) { if (!DEMO_MODE) throw error; return getDemoDentistNotes() } }
@@ -346,10 +422,8 @@ export class DashboardService {
   }
 
   private static async requestBody<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } })
-    const body = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(body.message || `Request failed (${response.status})`)
+    const { ok, status, body } = await this.fetchJson(path, options)
+    if (!ok) throw new ApiError(typeof body.message === 'string' ? body.message : `Request failed (${status || 'network'})`, status)
     return body as T
   }
 }

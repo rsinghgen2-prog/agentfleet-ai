@@ -1,18 +1,16 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState, type CSSProperties } from 'react'
-import { Calendar, CalendarDays, CircleHelp, ClipboardList, FolderOpen, Grid2X2, HeartPulse, LogOut, Menu, MessageSquare, Moon, Receipt, Search, Settings, Smile, Sun, UsersRound } from 'lucide-react'
-import { useDentalDashboardData } from '../../hooks/useDentalDashboardData'
+import { Calendar, CalendarDays, CircleHelp, FolderOpen, Grid2X2, LogOut, Menu, MessageSquare, Moon, Package, Receipt, Search, Settings, Smile, Sun, Users } from 'lucide-react'
+import { useDentalDashboardData, clearDentalDashboardCache } from '../../hooks/useDentalDashboardData'
 import { useTheme } from '../../context/ThemeContext'
 import DentalSupportChat from './DentalSupportChat'
 import DentalNotificationCenter from './DentalNotificationCenter'
 
 const navItems = [
   { label: 'Dashboard', to: '/dental-client', icon: Grid2X2, end: true },
-  { label: 'Customer Overview', to: '/dental-client/customers-overview', icon: UsersRound },
-  { label: 'Dental Chart', to: '/dental-client/dental-chart', icon: Smile },
-  { label: 'Treatment Plan', to: '/dental-client/treatment-plan', icon: ClipboardList },
   { label: 'Appointments', to: '/dental-client/schedule', icon: CalendarDays },
-  { label: 'Medical History', to: '/dental-client/medical-history', icon: HeartPulse },
+  { label: 'Patients', to: '/dental-client/patients', icon: Users },
+  { label: 'Inventory', to: '/dental-client/inventory', icon: Package },
   { label: 'Billing & Payments', to: '/dental-client/payments', icon: Receipt },
   { label: 'Documents', to: '/dental-client/documents', icon: FolderOpen },
   { label: 'Communications', to: '/dental-client/communications', icon: MessageSquare },
@@ -34,7 +32,10 @@ export default function DentalClientShell() {
   const [supportOpen, setSupportOpen] = useState(false)
   const [search, setSearch] = useState('')
   const clientName = (() => {
-    try { return JSON.parse(localStorage.getItem('clientData') || '{}').clientName || 'Dr. Rajeev Pratap Singh' } catch { return 'Dr. Rajeev Pratap Singh' }
+    try {
+      const stored = JSON.parse(localStorage.getItem('clientData') || '{}').clientName
+      return stored && stored !== 'undefined' ? stored : 'Dr. Rajeev Pratap Singh'
+    } catch { return 'Dr. Rajeev Pratap Singh' }
   })()
   const clinicName = settings?.clinic_name || client?.brandName || 'Dental Clinic'
   const primaryColor = settings?.branding?.primaryColor || client?.primaryColor || '#005db6'
@@ -56,7 +57,10 @@ export default function DentalClientShell() {
     localStorage.removeItem('userType')
     localStorage.removeItem('currentUser')
     localStorage.removeItem('isSuperAdmin')
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('refreshToken')
     sessionStorage.clear()
+    clearDentalDashboardCache()
     navigate('/login')
   }
 
